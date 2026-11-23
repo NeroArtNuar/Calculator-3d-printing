@@ -3643,3 +3643,12 @@ textarea {
   opacity: 1;
   transform: none
 }
+
+.has-tip {
+  cursor: help
+}
+.lbl.has-tip {
+  text-decoration: underline dotted;
+  text-decoration-color: color-mix(in srgb, currentColor 45%, transparent);
+  text-underline-offset: 3px
+}

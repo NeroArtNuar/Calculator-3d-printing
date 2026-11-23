@@ -13,7 +13,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" integrity="sha512-dLxUelApnYxpLt6K2iomGngnHO83iUvZytA3YjDUCjT0HDOHKXnVYdf3hU4JjM8uEhxf9nD1/ey98U3t2vZ0qQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" integrity="sha512-XMVd28F1oH/O71fzwBnV7HucLxVwtxf26XV8P4wPk26EDxuGZ91N8bsOttmnomcCD3CS5ZMRL50H0GgOHvegtg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script>/* CDN недоступен или файл подменён — берём копии из репозитория */window.THREE||document.write('<script src="vendor/three-r128.min.js"><\/script>');window.JSZip||document.write('<script src="vendor/jszip-3.10.1.min.js"><\/script>');</script>
-<link rel="stylesheet" href="styles.css?v=145ddf6d">
+<link rel="stylesheet" href="styles.css?v=b46750cb">
 </head>
 <body>
 <div class="as-bar" id="asBar" hidden><span id="asBarT"></span> · <button class="as-bar-x" type="button" id="asBarX">Выйти из просмотра</button></div>
@@ -220,7 +220,7 @@
           <label class="field adv"><span class="lbl">Слой</span><span class="inp"><select data-bind="sls.layer" data-num><option value="0.075">0.075</option><option value="0.1">0.10</option><option value="0.11">0.11</option><option value="0.125">0.125</option><option value="0.15">0.15</option></select><em>мм</em></span></label>
           <label class="field pro"><span class="lbl">Запуск</span><span class="inp"><select data-bind="sls.share"><option value="own">Только этот заказ</option><option value="batch">Общий с другими заказами</option></select></span></label><label class="field pro"><span class="lbl">Загрузка общего запуска</span><span class="inp"><input type="number" min="10" max="100" step="5" data-bind="sls.fill"><em>%</em></span></label>
           <div class="field adv u-full"><span class="lbl">Из программы подготовки (Sinterit Studio, PreForm…) — необязательно</span><div class="grid"><label class="field"><span class="lbl">Масса 1 шт</span><span class="inp"><input type="number" min="0" step="0.1" data-bind="sls.mG" aria-label="Масса 1 шт из программы подготовки"><em>г</em></span></label><label class="field"><span class="lbl">Высота сборки</span><span class="inp"><input type="number" min="0" step="1" data-bind="sls.mH" aria-label="Высота сборки"><em>мм</em></span></label><label class="field"><span class="lbl">Время запуска (весь тираж)</span><span class="inp"><input type="number" min="0" step="0.1" data-bind="sls.mT" aria-label="Время запуска"><em>ч</em></span></label></div><small class="cap">Если заданы масса и время — расчёт по ним, без оценки по модели. Очистите поля, чтобы вернуть оценку.</small></div>
-          <label class="field adv"><span class="lbl" title="Какую долю камеры занимают детали. Обычно 8–15%, у опытных — до 20%">Упаковка камеры</span><span class="inp"><input id="packInp" type="number" min="2" max="40" step="1" data-bind="sls.packing"><em>%</em></span></label>
+          <label class="field adv"><span class="lbl" title="Какую долю камеры занимают детали. Обычно 8–15%, у опытных — до 20%">Упаковка камеры</span><span class="inp"><input id="packInp" type="number" min="0.1" max="40" step="0.1" data-bind="sls.packing"><em>%</em></span></label>
         </div>
         <div class="u-col" id="estBox"></div>
       </div>
@@ -432,7 +432,7 @@
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-<script src="app.js?v=4b014237"></script>
+<script src="app.js?v=96abc679"></script>
 
 </body>
 </html>

@@ -729,7 +729,7 @@ window.__SMETA_SITE__ = 1;
       warmup: 60,
       recoat: 12,
       scanRate: 230,
-      cool: 0,
+      cool: 0, coolPct: 100,
       timeCal: 1
     }, {
       id: "lisax",
@@ -745,7 +745,7 @@ window.__SMETA_SITE__ = 1;
       warmup: 90,
       recoat: 25,
       scanRate: 100,
-      cool: 120,
+      cool: 120, coolPct: 100,
       timeCal: 1
     }, {
       id: "eos396",
@@ -761,7 +761,7 @@ window.__SMETA_SITE__ = 1;
       warmup: 120,
       recoat: 6,
       scanRate: 1500,
-      cool: 0,
+      cool: 0, coolPct: 100,
       timeCal: 1
     }],
     Hi = "октябрь 2026",
@@ -2845,11 +2845,19 @@ window.__SMETA_SITE__ = 1;
     return Math.min(500, Math.max(r(a, o), r(o, a)))
   }
 
+  /* Охлаждение SLS в станке: доля от времени печати запуска (по умолчанию 100% — сколько печатается, столько и остывает), но не меньше минут из профиля */
+  function loCool(e, printH) {
+    const pct = e.coolPct != null && e.coolPct !== "" && Number.isFinite(+e.coolPct) ? +e.coolPct : 100;
+    return Math.max((+e.cool || 0) / 60, Math.max(0, printH) * pct / 100)
+  }
+
   function os(t, e, n, a) {
     if (t.mT > 0) {
       const o = e.bedX * e.bedY,
         u = Math.min(e.bedZ, Math.max(5, t.mH || (t.dimZ || 0) + 4)),
-        P = (e.warmup + e.cool) / 60,
+        loW = (+e.warmup || 0) / 60,
+        loCl = loCool(e, t.mT),
+        P = loW + loCl,
         M = o * (u + 10) / 1e3 * n.bulk,
         E = t.grams * a,
         k = Math.max(E * 1.03, M * n.refresh / 100);
@@ -2859,7 +2867,8 @@ window.__SMETA_SITE__ = 1;
         layers: u / (t.layer || .11),
         tLayers: t.mT,
         tScan: 0,
-        tHeat: P,
+        tHeat: loW,
+        tCool: loCl,
         jobH: t.mT + P,
         loaded: M,
         fresh: k,
@@ -2871,7 +2880,7 @@ window.__SMETA_SITE__ = 1;
     const o = e.bedX * e.bedY,
       s = Math.max(10, e.bedZ - 10),
       i = t.vol * 1e3,
-      r = Math.max(i / Math.max(.01, (t.packing || 10) / 100), (t.bboxVol || 0) * 1e3 * .6),
+      r = Math.max(i / Math.max(5e-4, (t.packing || 10) / 100), (t.bboxVol || 0) * 1e3 * .6),
       c = r * a,
       d = Math.max(1, Math.ceil(c / (o * s))),
       u = Math.min(e.bedZ, Math.max((t.dimZ || 0) + 4, c / d / o + 4)),
@@ -2879,7 +2888,9 @@ window.__SMETA_SITE__ = 1;
       x = e.timeCal || 1,
       m = p * e.recoat / 3600 * x,
       L = i * a / d / 1e3 / Math.max(1, e.scanRate) * x,
-      P = (e.warmup + e.cool) / 60,
+      loW = (+e.warmup || 0) / 60,
+      loCl = loCool(e, m + L),
+      P = loW + loCl,
       M = o * (u + 10) / 1e3 * n.bulk,
       E = t.grams * a / d,
       k = Math.max(E * 1.03, M * n.refresh / 100);
@@ -2889,7 +2900,8 @@ window.__SMETA_SITE__ = 1;
       layers: p,
       tLayers: m,
       tScan: L,
-      tHeat: P,
+      tHeat: loW,
+      tCool: loCl,
       jobH: m + L + P,
       loaded: M,
       fresh: k,
@@ -6379,7 +6391,7 @@ onmessage=e=>{const{id,pos,keys,fdm,light,hull}=e.data;if(hull){try{postMessage(
           ["Высота сборки", `${S(c.H,0)} мм`],
           ["Станок", vt(r.machineH * 3600)]
         ]
-      ]) + on(["Порошок за запуск", "г"], [`<tr><td>${Kt("#0b6a89")}Насыпано в камеру</td><td class="n">${S(c.loaded,0)}</td></tr>`, `<tr><td>${Kt("#2e9e74")}В деталях</td><td class="n">${S(c.partsMass,0)}</td></tr>`, `<tr><td>${Kt("#d9a521")}Расход свежего (освежение ${r.mt.refresh}%)</td><td class="n">${S(c.fresh,0)}</td></tr>`]) + on(["Время запуска", "Время"], [`<tr><td>${Kt("#7d8b95")}Нанесение ${S(c.layers,0)} ${loPl(c.layers,"слоя","слоёв","слоёв")}</td><td class="n">${vt(c.tLayers*3600)}</td></tr>`, `<tr><td>${Kt("#c8423b")}Спекание</td><td class="n">${vt(c.tScan*3600)}</td></tr>`, `<tr><td>${Kt("#d9a521")}Нагрев и охлаждение</td><td class="n">${vt(c.tHeat*3600)}</td></tr>`])
+      ]) + on(["Порошок за запуск", "г"], [`<tr><td>${Kt("#0b6a89")}Насыпано в камеру</td><td class="n">${S(c.loaded,0)}</td></tr>`, `<tr><td>${Kt("#2e9e74")}В деталях</td><td class="n">${S(c.partsMass,0)}</td></tr>`, `<tr><td>${Kt("#d9a521")}Расход свежего (освежение ${r.mt.refresh}%)</td><td class="n">${S(c.fresh,0)}</td></tr>`]) + on(["Время запуска", "Время"], [`<tr><td>${Kt("#7d8b95")}Нанесение ${S(c.layers,0)} ${loPl(c.layers,"слоя","слоёв","слоёв")}</td><td class="n">${vt(c.tLayers*3600)}</td></tr>`, `<tr><td>${Kt("#c8423b")}Спекание</td><td class="n">${vt(c.tScan*3600)}</td></tr>`, `<tr><td>${Kt("#d9a521")}Нагрев камеры</td><td class="n">${vt(c.tHeat*3600)}</td></tr>`, `<tr><td>${Kt("#5b7fbf")}Охлаждение в станке</td><td class="n">${vt((c.tCool||0)*3600)}</td></tr>`])
     } else t.innerHTML = "";
     const s = f("btnCalib");
     s && (s.onclick = dr)
@@ -6512,12 +6524,12 @@ onmessage=e=>{const{id,pos,keys,fdm,light,hull}=e.data;if(hull){try{postMessage(
         mat: m.map(({
           it: y,
           c: b
-        }) => tt.has(b.tech) ? p(`${J(y.name)}: ${S(y.ml*b.qty,1)} мл + потери ${n.waste}% = ${S(b.detail.mlTot,1)} мл`, `${S(b.detail.mlTot/1e3*b.mt.price,2)} ₽`) + (y.plateCost ? p(`Спирт, перчатки: ${b.plates} × ${S(y.plateCost)} ₽`, Q(b.plates * y.plateCost, 2)) : "") : p(`${J(y.name)}: ${i(b.gramsNet)} + потери ${n.waste}% = ${i(b.gramsTot)}`, `${S(b.gramsTot/1e3*(y.priceKg>0?y.priceKg:b.mt.price),2)} ₽`)).join("") + (m.length < x.length ? p(`…ещё ${x.length-m.length} позиций`, Q(x.slice(m.length).reduce((y, b) => y + b.c.mat, 0), 2)) : "") + p(o && tt.has(o.c.tech) ? "Цена смолы" : "Цена пластика", o ? `${S(c)} ₽/${tt.has(o.c.tech)?"л":"кг"} (${J(o.c.mt.name)})` : t.lines.length === 1 ? `${J(t.lines[0].c.mt.name)}` : "по материалам позиций"),
-        mach: p(tt.has(r.tech) ? r.tech === "sla" ? "Печать: лазер и разравнивание слоёв" : "Печать: засветка и подъём слоёв" : r.tech === "sls" ? "Печать: нанесение и спекание слоёв" : t.lines.length > 1 ? "Печать" : loGc && kn() ? "Печать (из G-code)" : kn() ? "Печать (из слайсера)" : "Печать (оценка по модели)", `${S(s.printH,2)} ч`) + p(`${tt.has(r.tech)?"Подготовка ванны":"Прогрев стола"}: ${t.plates} × ${S(r.warmup)} мин`, `${S(s.warmH,2)} ч`) + (s.chamberH > 0 ? p(`Прогрев камеры дольше стола: ${t.plates} × ${S(Math.max(0,r.chamberMin-r.warmup))} мин`, `${S(s.chamberH,2)} ч`) : "") + (s.share != null ? p(`Доля общего стола (загрузка ${S(o.it.share)}%)`, `${S(s.share*100,1)}%`) : "") + p(`Амортизация: ${S(r.price)} ₽ ÷ ${S(r.life)} ч`, `${S(r.price/Math.max(1,r.life),2)} ₽/ч`) + p("Расходники и ремонт", `${S(r.maint,2)} ₽/ч`) + p(`Итого ${S(t.machineH,2)} ч × ${S(d,2)} ₽/ч`, Q(t.b.mach, 2)),
+        }) => tt.has(b.tech) ? p(`${J(y.name)}: ${S(y.ml*b.qty,1)} мл + потери ${n.waste}% = ${S(b.detail.mlTot,1)} мл`, `${S(b.detail.mlTot/1e3*b.mt.price,2)} ₽`) + (y.plateCost ? p(`Спирт, перчатки: ${b.plates} × ${S(y.plateCost)} ₽`, Q(b.plates * y.plateCost, 2)) : "") : b.tech === "sls" && b.detail ? p(`${J(y.name)}: в деталях ${i(b.gramsNet)}`, "") + p(`Насыпано в камеру: ${b.detail.jobs} × ${i(b.detail.loaded)}, освежение ${S(b.mt.refresh)}%`, i(b.gramsTot)) + p("Свежий порошок", `${S(b.gramsTot/1e3*(y.priceKg>0?y.priceKg:b.mt.price),2)} ₽`) : p(`${J(y.name)}: ${i(b.gramsNet)} + потери ${n.waste}% = ${i(b.gramsTot)}`, `${S(b.gramsTot/1e3*(y.priceKg>0?y.priceKg:b.mt.price),2)} ₽`)).join("") + (m.length < x.length ? p(`…ещё ${x.length-m.length} позиций`, Q(x.slice(m.length).reduce((y, b) => y + b.c.mat, 0), 2)) : "") + p(o && tt.has(o.c.tech) ? "Цена смолы" : o && o.c.tech === "sls" ? "Цена порошка" : "Цена пластика", o ? `${S(c)} ₽/${tt.has(o.c.tech)?"л":"кг"} (${J(o.c.mt.name)})` : t.lines.length === 1 ? `${J(t.lines[0].c.mt.name)}` : "по материалам позиций"),
+        mach: (o && o.c.tech === "sls" && o.c.detail ? p(`Печать: нанесение ${S(o.c.detail.layers,0)} ${loPl(o.c.detail.layers,"слоя","слоёв","слоёв")} и спекание${o.c.detail.jobs>1?` · ${o.c.detail.jobs} запуска`:""}`, `${S(o.c.detail.jobs*(o.c.detail.tLayers+o.c.detail.tScan),2)} ч`) + p(`Нагрев камеры: ${o.c.detail.jobs} × ${S(r.warmup)} мин`, `${S(o.c.detail.jobs*o.c.detail.tHeat,2)} ч`) + p(`Охлаждение в станке: ${S(r.coolPct!=null&&r.coolPct!==""?+r.coolPct:100)}% от печати${+r.cool>0?`, не меньше ${S(r.cool)} мин`:""}`, `${S(o.c.detail.jobs*(o.c.detail.tCool||0),2)} ч`) : "") + (o && o.c.tech === "sls" && o.c.detail ? "" : p(tt.has(r.tech) ? r.tech === "sla" ? "Печать: лазер и разравнивание слоёв" : "Печать: засветка и подъём слоёв" : r.tech === "sls" ? "Печать: нанесение и спекание слоёв" : t.lines.length > 1 ? "Печать" : loGc && kn() ? "Печать (из G-code)" : kn() ? "Печать (из слайсера)" : "Печать (оценка по модели)", `${S(s.printH,2)} ч`) + p(`${tt.has(r.tech)?"Подготовка ванны":"Прогрев стола"}: ${t.plates} × ${S(r.warmup)} мин`, `${S(s.warmH,2)} ч`)) + (s.chamberH > 0 ? p(`Прогрев камеры дольше стола: ${t.plates} × ${S(Math.max(0,r.chamberMin-r.warmup))} мин`, `${S(s.chamberH,2)} ч`) : "") + (s.share != null && (o || t.lines[0]) ? p(`Доля общего стола (загрузка ${S((o || t.lines[0]).it.share)}%)`, `${S(s.share*100,1)}%`) : "") + p(`Амортизация: ${S(r.price)} ₽ ÷ ${S(r.life)} ч`, `${S(r.price/Math.max(1,r.life),2)} ₽/ч`) + p("Расходники и ремонт", `${S(r.maint,2)} ₽/ч`) + p(`Итого ${S(t.machineH,2)} ч × ${S(d,2)} ₽/ч`, Q(t.b.mach, 2)),
         energy: p(`Мощность: принтер ${S(r.power)} Вт${(o?o.c.watts:t.lines.reduce((x,y)=>Math.max(x,y.c.watts||0),0))>(+r.power||0)?` + камера ${S(r.chamberPower)} Вт`:""}`, `${S(s.kwhUsed,2)} кВт·ч`) + (n.twoRate ? p(`День ${S((1-s.night)*100,0)}% × ${S(n.kwh,2)} ₽ · ночь ${S(s.night*100,0)}% × ${S(n.kwhNight,2)} ₽`, `${S(s.kwhEff,2)} ₽/кВт·ч`) : p("Тариф", `${S(n.kwh,2)} ₽/кВт·ч`)) + (n.twoRate ? p("Старт печати", ra(n.start) != null || (ra(n.busyUntil) || 0) > Date.now() ? Rt(t.plan.start) : "не задан — средний тариф за сутки") : ""),
-        labor: (a.labor ? p(`Приём заказа: ${n.setupMin} мин`, Q(s.setupH * n.rate, 2)) + p(`${o&&tt.has(o.c.tech)?"Мойка и засветка":"Снятие со стола"}: ${t.plates} × ${S(o&&Number.isFinite(o.it.plateMin)?o.it.plateMin:n.plateMin)} мин`, Q(s.plateLabH * n.rate, 2)) : "") + (a.post ? p(`Постобработка: ${S(t.qty)} шт, всего ${S(s.postH*60,0)} мин`, Q(s.postH * n.rate, 2)) : "") + p("Ставка оператора", `${S(n.rate)} ₽/ч`),
+        labor: (a.labor ? p(`Приём заказа: ${n.setupMin} мин`, Q(s.setupH * n.rate, 2)) + p(`${o&&tt.has(o.c.tech)?"Мойка и засветка":o&&o.c.tech==="sls"?"Распаковка и очистка":"Снятие со стола"}: ${t.plates} × ${S(o&&Number.isFinite(o.it.plateMin)?o.it.plateMin:n.plateMin)} мин`, Q(s.plateLabH * n.rate, 2)) : "") + (a.post ? p(`Постобработка: ${S(t.qty)} шт, всего ${S(s.postH*60,0)} мин`, Q(s.postH * n.rate, 2)) : "") + p("Ставка оператора", `${S(n.rate)} ₽/ч`),
         extra: p(`Моделирование: ${S(n.cadH,1)} ч × ${S(n.cadRate)} ₽`, Q(s.cad, 2)),
-        risk: p("База: пластик + станок + энергия + снятие", Q(s.riskBase, 2)) + p(`× ${n.risk}% ÷ (1 − ${n.risk}%)`, Q(t.b.risk, 2))
+        risk: p(`База: ${o&&o.c.tech==="sls"?"порошок":o&&tt.has(o.c.tech)?"смола":"материал"} + станок + энергия + ${o&&o.c.tech==="sls"?"распаковка":o&&tt.has(o.c.tech)?"мойка":"снятие"}`, Q(s.riskBase, 2)) + p(`× ${n.risk}% ÷ (1 − ${n.risk}%)`, Q(t.b.risk, 2))
       },
       M = [
         ["mat", o && o.c.tech === "sls" ? "Порошок" : o && tt.has(o.c.tech) ? "Смола и расходники" : !o && t.lines.some(y => tt.has(y.c.tech)) ? "Материалы" : "Пластик", "--c-mat"],
@@ -8697,7 +8709,7 @@ uniform float uLayerH;`).replace("#include <color_fragment>", `#include <color_f
     } catch (t) {
       console.error(t), lt = null
     }
-    kn() || qs(), loSyncCur(), Ao(), Ae() && ce(), Yc(), gt();
+    loSafe(() => kn() || qs()), loSafe(loSyncCur), loSafe(Ao), loSafe(() => Ae() && ce()), loSafe(Yc), loSafe(gt);
     try {
       loCmp()
     } catch (t) {
@@ -8725,6 +8737,14 @@ uniform float uLayerH;`).replace("#include <color_fragment>", `#include <color_f
         })
       } else nt.del("lo.parts")
     } catch (t) {}
+  }
+  /* Один упавший блок не должен «замораживать» всю смету: ошибка пишется в консоль, остальное обновляется */
+  function loSafe(fn) {
+    try {
+      return fn()
+    } catch (e) {
+      console.error("Смета 3D:", e)
+    }
   }
   let loCur = null;
   const loGeo = new Map;
@@ -8855,24 +8875,33 @@ uniform float uLayerH;`).replace("#include <color_fragment>", `#include <color_f
     e && (e.hidden = !t, e.textContent = t || "")
   }
 
+  const loSoloG = {};
+
   function loDraw() {
     if (!Re || !Lt || typeof THREE > "u") return;
     loGrp || (loGrp = new THREE.Group, Lt.add(loGrp));
     const pr = ht(),
-      all = l.basket.filter(b => loGeo.has(b.id)),
+      solo = !loCur && !!H && !!H.st && !(l.basket || []).length,
+      cid = solo ? "__solo" : loCur,
+      G = id => id === "__solo" ? (loSoloG.H !== H && (loSoloG.H = H), loSoloG) : loGeo.get(id),
+      all = solo ? [{
+        id: "__solo",
+        tech: l.tech,
+        qty: Math.max(1, Math.round(+l.part.qty || 1))
+      }] : l.basket.filter(b => loGeo.has(b.id)),
       parts = all.filter(b => b.tech === l.tech),
-      k = JSON.stringify([loCur, l.tech, pr.id, pr.bedX, pr.bedY, all.map(b => [b.id, b.tech, b.qty, (loGeo.get(b.id).H || {}).ver])]);
+      k = JSON.stringify([cid, l.tech, pr.id, pr.bedX, pr.bedY, all.map(b => [b.id, b.tech, b.qty, (G(b.id).H || {}).ver])]);
     if (k === loDk) return;
     loDk = k;
     for (; loGrp.children.length;) loGrp.remove(loGrp.children[0]);
-    if (!loCur || !H || !all.length) {
+    if (!cid || !H || !all.length || solo && all[0].qty < 2) {
       He.position.set(0, 0, 0), loBed(""), zt = !0;
       return
     }
     const gap = tt.has(l.tech) ? 3 : 5,
       it = [];
     for (const b of parts) {
-      const g = loGeo.get(b.id),
+      const g = G(b.id),
         d = g.H === H ? H.st : g.H.st || g.d || {
           dimX: 20,
           dimY: 20
@@ -8885,7 +8914,7 @@ uniform float uLayerH;`).replace("#include <color_fragment>", `#include <color_f
         g
       })
     }
-    it.sort((a, b) => (b.id === loCur) - (a.id === loCur) || b.h - a.h);
+    it.sort((a, b) => (b.id === cid) - (a.id === cid) || b.h - a.h);
     const BX = pr.bedX,
       BY = pr.bedY;
     let x = 0,
@@ -8904,7 +8933,7 @@ uniform float uLayerH;`).replace("#include <color_fragment>", `#include <color_f
         cy: y + p.h / 2 - gap / 2 - BY / 2
       }), x += p.w, row = Math.max(row, p.h)
     }
-    const cur = pl.find(p => p.id === loCur) || {
+    const cur = pl.find(p => p.id === cid) || {
       cx: 0,
       cy: 0
     };
@@ -8919,7 +8948,7 @@ uniform float uLayerH;`).replace("#include <color_fragment>", `#include <color_f
     });
     let first = !0;
     for (const p of pl) {
-      if (p.id === loCur && first) {
+      if (p.id === cid && first) {
         first = !1;
         continue
       }
@@ -8934,7 +8963,17 @@ uniform float uLayerH;`).replace("#include <color_fragment>", `#include <color_f
     const ot = {};
     for (const b of all) b.tech !== l.tech && (ot[Nt[b.tech].name] = (ot[Nt[b.tech].name] || 0) + 1);
     const os = Object.entries(ot).map(([n, c]) => `${n}: ${c}`).join(", ");
-    loBed([`На столе ${Nt[l.tech].name}: ${S(pl.length)} шт` + (over ? `, не поместилось ${S(over)} — пойдут на следующие столы` : ""), os ? `другие технологии — ${os} (выберите деталь в списке)` : ""].filter(Boolean).join(" · ")), zt = !0
+    const loQ = solo ? all[0].qty : 0,
+      loCi = solo ? (() => {
+        try {
+          const z = Pe();
+          return z ? ca(z, l.money) : null
+        } catch (e) {
+          return null
+        }
+      })() : null,
+      loN = loCi && Number.isFinite(loCi.plates) ? Math.max(1, Math.round(loCi.plates)) : Math.max(1, Math.ceil(loQ / Math.max(1, pl.length)));
+    loBed([solo ? (l.tech === "sls" ? `В камере: ${S(loQ)} шт · ${loN} ${loPl(loN,"запуск","запуска","запусков")} (детали в несколько ярусов)` : `На столе: ${S(Math.min(pl.length, loQ))} из ${S(loQ)} шт` + (loN > 1 ? ` · ${loN} ${loPl(loN,"стол","стола","столов")}` : "")) : `На столе ${Nt[l.tech].name}: ${S(pl.length)} шт` + (over ? `, не поместилось ${S(over)} — пойдут на следующие столы` : ""), os ? `другие технологии — ${os} (выберите деталь в списке)` : ""].filter(Boolean).join(" · ")), zt = !0
   }
 
   function loPartsInit() {
@@ -8954,7 +8993,7 @@ uniform float uLayerH;`).replace("#include <color_fragment>", `#include <color_f
         c = new THREE.Raycaster;
       c.setFromCamera(q, Fe);
       const h = c.intersectObjects(loGrp.children, !1)[0];
-      h && h.object.userData.pid && loSelect(h.object.userData.pid)
+      h && h.object.userData.pid && h.object.userData.pid !== "__solo" && loSelect(h.object.userData.pid)
     })
   }
   let loStepN = 1;
@@ -9816,8 +9855,13 @@ uniform float uLayerH;`).replace("#include <color_fragment>", `#include <color_f
       u: "мин",
       s: 5
     }, {
+      k: "coolPct",
+      l: "Охлаждение, % от печати",
+      u: "%",
+      s: 10
+    }, {
       k: "cool",
-      l: "Охлаждение в станке",
+      l: "Охлаждение не меньше",
       u: "мин",
       s: 10
     }, {
@@ -10049,7 +10093,7 @@ uniform float uLayerH;`).replace("#include <color_fragment>", `#include <color_f
       d = a ? yn(o) : l.materials.filter(L => L.tech === s),
       u = a ? l.printers : l.materials,
       p = !n || (a ? o === l.tech : s === cn(l.tech));
-    xe((e === "edit" ? "Изменить " : "Новый ") + (a ? `принтер ${Nt[o].name}` : "материал"), lr(i, c) + (a && o === "fdm" ? '<div id="spBlock" class="sp-block"></div>' : ""), `${e==="edit"&&d.length>1?'<button class="btn danger" type="button" id="dlgDel">Удалить</button>':""}<div class="right"><button class="btn" type="button" id="dlgCancel">Отмена</button><button class="btn primary" type="button" id="dlgSave">Сохранить</button></div>`), f("dlgCancel").onclick = Mt;
+    xe((e === "edit" ? "Изменить " : "Новый ") + (a ? `принтер ${Nt[o].name}` : "материал"), lr(i, a && o === "sls" && (c.coolPct == null || c.coolPct === "") ? { ...c, coolPct: 100 } : c) + (a && o === "fdm" ? '<div id="spBlock" class="sp-block"></div>' : ""), `${e==="edit"&&d.length>1?'<button class="btn danger" type="button" id="dlgDel">Удалить</button>':""}<div class="right"><button class="btn" type="button" id="dlgCancel">Отмена</button><button class="btn primary" type="button" id="dlgSave">Сохранить</button></div>`), f("dlgCancel").onclick = Mt;
     const x = a && o === "fdm" ? rr(c) : null;
     f("dlgSave").onclick = () => {
       const L = cr(i);
@@ -10585,25 +10629,227 @@ uniform float uLayerH;`).replace("#include <color_fragment>", `#include <color_f
   })
 })();
 
-
-/* ===== Длинные подписи: выравнивание рядов и облачко с полным текстом ===== */
+/* ===== Подсказки-облачка: описания параметров, полный текст обрезанных надписей, выравнивание рядов ===== */
 (() => {
+  const TIP = {
+    /* Модель */
+    unitSel: "В каких единицах сохранён файл. Если деталь вышла в 25 раз меньше или больше — выберите дюймы или сантиметры.",
+    scalePct: "Увеличить или уменьшить модель. 100% — как в файле.",
+    dimX: "Размер детали по оси X, мм. Можно ввести нужный — масштаб пересчитается.",
+    dimY: "Размер детали по оси Y, мм. Можно ввести нужный — масштаб пересчитается.",
+    dimZ: "Высота детали, мм. Можно ввести нужную — масштаб пересчитается.",
+    scaleLock: "Менять все размеры вместе, сохраняя пропорции.",
+    scaleLock2: "Менять все размеры вместе, сохраняя пропорции.",
+    stabChk: "Дополнительные опоры, чтобы тяжёлая или наклонённая деталь не оторвалась и не перекосилась при печати.",
+    cadAcc: "Модель нужна точно по размерам — моделирование займёт больше времени.",
+    cadNoDims: "Точных размеров нет — их придётся снимать или подбирать, это дольше.",
+    cadRush: "Моделирование вне очереди — с надбавкой за срочность.",
+    /* Печать */
+    printerSel: "На каком принтере печатать. От него зависят скорость, размер стола и стоимость часа работы.",
+    matSel: "Материал детали: влияет на цену, прочность и внешний вид.",
+    "slicer.nozzle": "Диаметр сопла. Шире — быстрее и прочнее, уже — точнее мелкие детали.",
+    "slicer.layer": "Толщина одного слоя. Тоньше — глаже поверхность, но печать дольше.",
+    "slicer.walls": "Сколько линий идёт по контуру детали. Больше стенок — прочнее и тяжелее.",
+    "slicer.top": "Сплошные слои сверху и снизу: закрывают внутреннее заполнение.",
+    "slicer.infill": "Насколько плотно деталь заполнена внутри. 15% — обычно, от 40% — для нагруженных деталей.",
+    "slicer.supports": "Опоры под нависающие части. «Где нужны» — под нависаниями круче 45°.",
+    "slicer.supportType": "Обычные или древовидные опоры. Древовидные легче снимаются и тратят меньше пластика.",
+    "slicer.brim": "Тонкая «юбка» вокруг детали на первом слое, чтобы деталь не отрывалась от стола.",
+    chamberChk: "Нагрев закрытой камеры принтера. Нужен для ABS, ASA, нейлона и поликарбоната — без него деталь трескается и коробится.",
+    "sla.layer": "Толщина слоя смолы. Тоньше — точнее и глаже, но дольше.",
+    "sla.supports": "Печатать на опорах или прямо на платформе. На платформе — только для плоских деталей без нависаний.",
+    "sla.density": "Сколько опор и какой толщины. Плотнее — надёжнее для тяжёлых деталей, но больше следов на поверхности.",
+    "sla.tilt": "Наклон детали на платформе. Уменьшает площадь слоя и риск отрыва, но добавляет высоту и опоры.",
+    "sla.hollow": "Сделать деталь полой внутри — экономит смолу. Нужны отверстия, чтобы смола вытекла.",
+    "sla.wall": "Толщина стенки полой детали.",
+    "sla.share": "Свой стол — заказ платит за весь стол. Общий — стол делится с другими заказами, время и расходники считаются по доле.",
+    "sla.fill": "Насколько обычно заполнен общий стол. Меньше загрузка — дороже доля одной детали.",
+    "sla.washMin": "Мойка в спирте и УФ-засветка — минут на каждый стол.",
+    "sla.washCost": "Спирт, перчатки, фильтры — расходники на каждый стол.",
+    "sls.layer": "Толщина слоя порошка. Тоньше — глаже, но запуск дольше.",
+    "sls.mG": "Масса одной детали из программы подготовки. Если указаны масса и время — расчёт идёт по ним, а не по модели.",
+    "sls.mH": "Высота всей сборки в камере из программы подготовки — от неё зависит, сколько порошка насыпается.",
+    "sls.mT": "Время печати всего запуска из программы подготовки, без нагрева и охлаждения.",
+    "sls.packing": "Какую долю объёма камеры занимают детали. У мелких деталей часто 0,5–2%. Плотнее упаковка — больше деталей в запуске, дешевле каждая.",
+    "sls.unpackMin": "Распаковка и очистка деталей от порошка — минут на каждый запуск.",
+    "sls.share": "Свой запуск — заказ платит за весь запуск. Общий — запуск делится с другими заказами.",
+    "sls.fill": "Насколько обычно заполнен общий запуск. Меньше загрузка — дороже доля одной детали.",
+    manAmt: "Сколько материала уходит на одну деталь — возьмите из слайсера.",
+    manH: "Время печати одной детали из слайсера, без прогрева стола.",
+    orcaMachine: "Профиль принтера в OrcaSlicer, по которому нарезать модель.",
+    orcaProcess: "Профиль процесса OrcaSlicer: слой, скорости, стенки.",
+    orcaFilament: "Профиль пластика в OrcaSlicer.",
+    orcaInfill: "Заполнение для нарезки в OrcaSlicer.",
+    orcaWalls: "Число стенок для нарезки в OrcaSlicer.",
+    orcaSupport: "Поддержки для нарезки в OrcaSlicer.",
+    orcaAuto: "Нарезать модель в OrcaSlicer сразу после загрузки, без отдельной кнопки.",
+    "@Из программы подготовки": "Если у вас есть точные масса и время из программы подготовки SLS — впишите их, расчёт пойдёт по ним.",
+    /* Заказ, услуги, сроки */
+    "part.name": "Название детали — попадёт в выписку и КП.",
+    "part.qty": "Сколько одинаковых деталей нужно.",
+    "part.perPlate": "Сколько деталей ставить на один стол. 0 — калькулятор посчитает сам по размерам стола.",
+    "part.postMin": "Ручная работа на каждую деталь: снять поддержки, зачистить, обработать.",
+    "part.inserts": "Резьбовые втулки или магниты, которые вплавляются в деталь, — стоимость на штуку.",
+    "part.paintOn": "Добавить покраску деталей.",
+    "part.packOn": "Добавить упаковку заказа.",
+    "money.cadH": "Сколько часов уйдёт на создание модели, если её делает мастерская.",
+    "part.leadDays": "Срок в рабочих днях, который вы обещаете клиенту. Пусто — калькулятор посчитает сам.",
+    "money.deadline": "К какой дате нужен заказ. Если в обычной очереди не успеваем — включится надбавка за срочность.",
+    "money.busyUntil": "До какого времени принтер занят другими заказами — от этого считается старт печати.",
+    "money.start": "Когда начнётся печать. Пусто — как только освободится принтер. Влияет на ночной тариф.",
+    /* Цена */
+    "money.markup": "На сколько процентов цена выше себестоимости производства.",
+    "money.adjust": "Разовая скидка (минус) или надбавка (плюс) к цене этого заказа.",
+    "money.minOrder": "Меньше этой суммы заказ не принимается: если вышло меньше, к оплате — минимум.",
+    "money.taxRev": "Налог с выручки, например 6% УСН. Цена поднимается так, чтобы после налога осталась нужная сумма.",
+    "money.vat": "НДС, который добавляется к цене. 0 — без НДС.",
+    "money.mgrTol": "Насколько сотрудник может менять наценку и скидку относительно ваших значений.",
+    "money.optOn": "Скидки за количество штук в заказе — по порогам из таблицы ниже.",
+    "money.shopName": "Название мастерской в шапке сайта и в КП.",
+    logoFile: "Логотип мастерской для шапки и КП — лучше PNG на прозрачном фоне.",
+    logoBgChk: "Светлая подложка под логотипом, если он тёмный и плохо виден в тёмной теме.",
+    brandClr: "Фирменный цвет: кнопки, заголовки и КП.",
+    "money.kpPay": "Условия оплаты для КП, например «предоплата 50%».",
+    "money.shopInfo": "Контакты и реквизиты мастерской — внизу КП.",
+    "money.cEmail": "Почта, на которую клиент отправит заявку из расчёта.",
+    "money.cTg": "Telegram, куда клиент отправит заявку из расчёта.",
+    "money.cWa": "WhatsApp, куда клиент отправит заявку из расчёта.",
+    "money.kpTpl": "Свой текст КП с подстановками. Пусто — стандартный текст.",
+    "money.kpDays": "Сколько дней действует коммерческое предложение.",
+    /* Производство */
+    "money.rate": "Стоимость часа ручной работы: приём заказа, снятие со стола, обработка.",
+    "money.prepMk": "Наценка на подготовку заказа (приём, прогрев, снятие). Обычно небольшая, чтобы мелкие заказы не дорожали вдвое.",
+    "money.setupMin": "Время на приём одного заказа: проверить модель, нарезать, ответить клиенту.",
+    "money.plateMin": "Время на снятие деталей и подготовку стола к следующей печати — на каждый стол.",
+    "money.kwh": "Цена киловатт-часа по вашему счёту за электричество.",
+    "money.twoRate": "Учитывать ночной тариф: часть печати идёт ночью и стоит дешевле.",
+    "money.kwhNight": "Цена киловатт-часа ночью.",
+    "money.nightFrom": "Во сколько начинается ночной тариф.",
+    "money.nightTo": "Во сколько заканчивается ночной тариф.",
+    "money.risk": "Доля деталей, которые придётся перепечатать из-за брака. Добавляется к себестоимости.",
+    "money.waste": "Сколько материала теряется сверх детали: продувка, остатки катушек, неудачные старты.",
+    "money.printers": "Сколько одинаковых принтеров печатают заказ одновременно — влияет на срок.",
+    "money.hoursPerDay": "Сколько часов в сутки принтер реально печатает — для срока в днях.",
+    "money.rushPct": "Надбавка, если заказ нужно сделать вне очереди.",
+    "money.offDays": "Даты, когда мастерская не работает, кроме государственных праздников.",
+    "money.maxDays": "Если срок выходит дольше — вместо цены калькулятор пишет «по запросу».",
+    "money.cadRate": "Стоимость часа моделирования.",
+    "money.modMin": "Меньше этой суммы моделирование не стоит.",
+    "money.mod*": "Влияет на оценку времени моделирования по описанию детали.",
+    pwStaff: "Новый пароль для режима «Сотрудник»: от 12 символов, буквы и цифры.",
+    pwFriend: "Новый пароль для режима «Друзья»: от 12 символов, буквы и цифры.",
+    pwPro: "Новый пароль владельца: от 12 символов, буквы и цифры.",
+    /* Профиль принтера */
+    "P:Название": "Как принтер называется в списке.",
+    "P:X": "Рабочая область по оси X, мм.",
+    "P:Y": "Рабочая область по оси Y, мм.",
+    "P:Z": "Максимальная высота печати, мм.",
+    "P:Стоимость": "Сколько стоил принтер — для расчёта амортизации.",
+    "P:Окупаемость": "За сколько часов работы принтер должен окупиться. Стоимость ÷ окупаемость = амортизация за час.",
+    "P:Расходники, ремонт": "Расходники и ремонт на час работы: сопла, плёнки, смазка, запчасти.",
+    "P:Средняя мощность": "Сколько принтер в среднем потребляет во время печати — для расчёта электричества.",
+    "P:Нагрев на стол": "Сколько минут греется стол перед каждой печатью.",
+    "P:Закрытый корпус": "1 — у принтера закрытый корпус, 0 — открытый. Закрытый нужен для ABS и других материалов с усадкой.",
+    "P:Ускорение": "Ускорение головы: насколько быстро принтер разгоняется на коротких линиях.",
+    "P:Предел потока": "Сколько пластика в секунду может расплавить хотэнд — ограничивает скорость печати.",
+    "P:Переезд и откат на контур": "Время на переезд и откат пластика перед каждым контуром.",
+    "P:Подготовка стола": "Подготовка ванны и платформы перед печатью, минут на стол.",
+    "P:Отрыв и разравнивание": "Время на отрыв слоя от плёнки и разравнивание смолы — на каждый слой.",
+    "P:Скорость обхода (слой 0.05)": "Сколько мм² сечения лазер обходит за секунду при слое 0,05 мм.",
+    "P:Засветка слоя": "Время засветки одного слоя.",
+    "P:Нижние слои": "Засветка первых слоёв — дольше обычной, чтобы деталь прилипла к платформе.",
+    "P:Нижних слоёв": "Сколько первых слоёв засвечиваются дольше.",
+    "P:Подъём и опускание": "Время подъёма и опускания платформы на каждом слое.",
+    "P:Нагрев камеры": "Нагрев камеры перед началом спекания, минут на запуск.",
+    "P:Охлаждение, % от печати": "Сколько запуск остывает в станке — в процентах от времени печати. 100% — сколько печатается, столько и остывает.",
+    "P:Охлаждение не меньше": "Минимальное охлаждение в станке, даже если запуск короткий.",
+    "P:Нанесение слоя": "Время нанесения одного слоя порошка.",
+    "P:Спекание": "Сколько см³ деталей лазер спекает за час.",
+    "P:Поправка времени": "Поправочный коэффициент к расчётному времени — подбирается сверкой с реальными печатями.",
+    "P:Закрытый корпус (1 — да, 0 — нет)": "1 — у принтера закрытый корпус, 0 — открытый. Закрытый нужен для ABS и других материалов с усадкой.",
+    "P:Базовая скорость": "Основная скорость печати, мм/с. В режиме «От базовой» остальные скорости считаются от неё.",
+    "P:Внешний периметр": "Скорость внешней стенки, мм/с. Медленнее — аккуратнее видимая поверхность.",
+    "P:Внутр. периметры": "Скорость внутренних стенок, мм/с.",
+    "P:Заполнение": "Скорость печати заполнения, мм/с — обычно самая высокая.",
+    "P:Сплошные слои": "Скорость сплошных слоёв сверху и снизу, мм/с.",
+    "P:Первый слой": "Скорость первого слоя, мм/с. Медленнее — лучше прилипает к столу.",
+    "P:Поддержки": "Скорость печати поддержек, мм/с.",
+    "P:Мосты": "Скорость печати мостов над пустотой, мм/с.",
+    "P:Нависание 25–50%": "Скорость на небольших нависаниях, мм/с.",
+    "P:Нависание 50–75%": "Скорость на средних нависаниях, мм/с.",
+    "P:Нависание 75–100%": "Скорость на сильных нависаниях, мм/с. Медленнее — меньше провисание.",
+    "@Цвет": "Цвет материала. «Любой» — мастерская выберет из того, что есть в наличии.",
+    /* Профиль материала */
+    "M:Название": "Как материал называется в списке.",
+    "M:Цена за кг": "Цена материала за килограмм.",
+    "M:Цена за литр": "Цена смолы за литр.",
+    "M:Плотность": "Плотность материала — для пересчёта объёма в вес.",
+    "M:Макс. поток": "Сколько этого пластика можно расплавить в секунду — ограничивает скорость печати.",
+    "M:Мин. время слоя": "Слой печатается не быстрее этого времени, чтобы успел остыть.",
+    "M:Множитель засветки": "Во сколько раз эту смолу засвечивают дольше обычной.",
+    "M:Плотность детали": "Плотность готовой спечённой детали.",
+    "M:Насыпная плотность": "Плотность порошка в насыпку: сколько граммов занимает 1 см³ камеры.",
+    "M:Освежение порошка": "Какую долю порошка в камере заменяют свежим после каждого запуска."
+  };
+
+  /* --- метки подсказок на подписях --- */
+  const dlgKind = f => {
+    if (!f.closest("#dlg")) return "";
+    const h = (document.getElementById("dlgTitle") || {}).textContent || "";
+    return /принтер/i.test(h) ? "P:" : /материал/i.test(h) ? "M:" : ""
+  };
+  const tipOf = (f, l) => {
+    const text = (l.textContent || "").trim().replace(/\s+/g, " ");
+    const nested = f.querySelector(":scope > .grid");
+    const c = nested ? null : f.querySelector("input, select, textarea");
+    const kind = dlgKind(f);
+    if (kind) {
+      const v = TIP[kind + text];
+      if (v) return v;
+      if (c && /^f_/.test(c.id)) return ""
+    }
+    const key = c ? (c.dataset.bind || c.id || "") : "";
+    if (key && TIP[key]) return TIP[key];
+    if (/^money\.mod[EK]\./.test(key)) return TIP["money.mod*"];
+    for (const k in TIP)
+      if (k[0] === "@" && text.startsWith(k.slice(1))) return TIP[k];
+    return ""
+  };
+  const markTips = () => {
+    document.querySelectorAll(".field, label.check").forEach(f => {
+      const l = f.matches("label.check") ? f : f.querySelector(":scope > .lbl, :scope > label.lbl");
+      if (!l) return;
+      const t = tipOf(f, l);
+      if (t) {
+        l.dataset.tip !== t && (l.dataset.tip = t);
+        l.classList.add("has-tip")
+      } else if (l.dataset.tip) {
+        delete l.dataset.tip;
+        l.classList.remove("has-tip")
+      }
+    })
+  };
+
+  /* --- выравнивание рядов с переносом подписей --- */
   const wraps = el => {
     const r = document.createRange();
     r.selectNodeContents(el);
-    const tops = new Set([...r.getClientRects()].map(q => Math.round(q.top)));
-    return tops.size > 1
+    return new Set([...r.getClientRects()].map(q => Math.round(q.top))).size > 1
   };
-  let pend = 0;
   const fitRows = () => {
-    pend = 0;
     document.querySelectorAll(".grid").forEach(g => {
       const lbls = [...g.querySelectorAll(":scope > .field > .lbl, :scope > label.field > .lbl")].filter(l => l.offsetParent);
       g.classList.remove("lbl-row");
       if (lbls.length > 1 && lbls.some(wraps)) g.classList.add("lbl-row")
     })
   };
-  const schedule = () => { pend || (pend = requestAnimationFrame(fitRows)) };
+  let pend = 0;
+  const run = () => {
+    pend = 0;
+    try { markTips() } catch (e) {}
+    try { fitRows() } catch (e) {}
+  };
+  const schedule = () => { pend || (pend = requestAnimationFrame(run)) };
   window.addEventListener("resize", schedule);
   const start = () => {
     schedule();
@@ -10611,6 +10857,7 @@ uniform float uLayerH;`).replace("#include <color_fragment>", `#include <color_f
   };
   document.readyState === "loading" ? document.addEventListener("DOMContentLoaded", start) : start();
 
+  /* --- облачко --- */
   let tip = null, cur = null, tm = 0;
   const canvas = document.createElement("canvas").getContext("2d");
   const ownText = e => [...e.childNodes].some(n => n.nodeType === 3 && n.textContent.trim());
@@ -10627,16 +10874,19 @@ uniform float uLayerH;`).replace("#include <color_fragment>", `#include <color_f
     return e.scrollWidth > e.clientWidth + 1 && (cs.overflowX === "hidden" || cs.textOverflow === "ellipsis")
   };
   const find = t => {
+    if (!t || t.nodeType !== 1) return null;
+    const h = t.closest(".has-tip");
+    if (h) return h;
     for (let e = t, i = 0; e && e !== document.body && i < 4; e = e.parentElement, i++) {
-      if (e.nodeType !== 1) continue;
       if (clipped(e)) return e;
       if (e.matches(".field, .card, .dialog, section")) break
     }
     return null
   };
-  const text = e => e.tagName === "SELECT" ? e.selectedOptions[0].text : (e.innerText || e.textContent || "").trim();
+  const text = e => e.dataset && e.dataset.tip ? e.dataset.tip : e.tagName === "SELECT" ? e.selectedOptions[0].text : (e.innerText || e.textContent || "").trim();
   const hide = () => {
-    clearTimeout(tm); cur = null;
+    clearTimeout(tm);
+    cur = null;
     tip && tip.classList.remove("on")
   };
   const show = e => {
@@ -10644,25 +10894,38 @@ uniform float uLayerH;`).replace("#include <color_fragment>", `#include <color_f
     tip.textContent = text(e);
     const r = e.getBoundingClientRect(), w = Math.min(380, innerWidth - 16);
     tip.style.maxWidth = w + "px";
-    tip.style.left = "0px"; tip.style.top = "0px";
+    tip.style.left = "0px";
+    tip.style.top = "0px";
     tip.classList.add("on");
     const tw = tip.offsetWidth, th = tip.offsetHeight;
-    let x = Math.max(8, Math.min(r.left, innerWidth - tw - 8)), y = r.bottom + 6;
-    y + th > innerHeight - 8 && (y = Math.max(8, r.top - th - 6));
-    tip.style.left = x + "px"; tip.style.top = y + "px"
+    let x = Math.max(8, Math.min(r.left, innerWidth - tw - 8)), y = r.top - th - 6;
+    y < 8 && (y = Math.min(innerHeight - th - 8, r.bottom + 6));
+    tip.style.left = x + "px";
+    tip.style.top = y + "px"
   };
   document.addEventListener("mouseover", ev => {
     const e = find(ev.target);
     if (e === cur) return;
     hide();
-    if (e) { cur = e; tm = setTimeout(() => cur === e && show(e), 250) }
+    if (e) {
+      cur = e;
+      tm = setTimeout(() => cur === e && show(e), 300)
+    }
   }, !0);
   document.addEventListener("mouseout", ev => { cur && !cur.contains(ev.relatedTarget) && hide() }, !0);
-  document.addEventListener("focusin", ev => { const e = find(ev.target); e && e.tagName === "SELECT" && (cur = e, show(e)) }, !0);
+  document.addEventListener("focusin", ev => {
+    const e = find(ev.target);
+    e && e.tagName === "SELECT" && (cur = e, show(e))
+  }, !0);
   document.addEventListener("focusout", hide, !0);
   document.addEventListener("scroll", hide, !0);
   document.addEventListener("touchstart", ev => {
     const e = find(ev.target);
-    if (e && !e.matches("select, input, textarea")) { cur = e; show(e); clearTimeout(tm); tm = setTimeout(hide, 2500) }
+    if (e && !e.matches("select, input, textarea")) {
+      cur = e;
+      show(e);
+      clearTimeout(tm);
+      tm = setTimeout(hide, 3500)
+    }
   }, { passive: !0 })
 })();
