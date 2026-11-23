@@ -10406,11 +10406,8 @@ uniform float uLayerH;`).replace("#include <color_fragment>", `#include <color_f
         a = loSa(m),
         v = i.target.checked;
       l.access === "pro" || l.access === "friend" ? (delete loCh[m.id], v === a ? delete m.chamber : m.chamber = v) : v === (m.chamber != null ? !!m.chamber : a) ? delete loCh[m.id] : loCh[m.id] = v, nt.set("lo.chamber", loCh), at()
-    }), f("editPrinter").onclick = () => de("printer", "edit"), f("addPrinter").onclick = () => de("printer", "add"), f("editMat").onclick = () => de("material", "edit"), f("addMat").onclick = () => de("material", "add"), f("dlgClose").onclick = Mt, f("dlg").addEventListener("pointerdown", i => {
-      f("dlg")._bgDown = i.target === f("dlg")
-    }), f("dlg").addEventListener("click", i => {
-      /* закрываем, только если и нажали, и отпустили на фоне — выделение текста с выходом за окно не закрывает его */
-      i.target === f("dlg") && f("dlg")._bgDown && Mt(), f("dlg")._bgDown = !1
+    }), f("editPrinter").onclick = () => de("printer", "edit"), f("addPrinter").onclick = () => de("printer", "add"), f("editMat").onclick = () => de("material", "edit"), f("addMat").onclick = () => de("material", "add"), f("dlgClose").onclick = Mt, f("dlg").addEventListener("click", i => {
+      /* клик по фону окно не закрывает — только крестик, «Отмена», «Сохранить» или Esc */
     }), document.addEventListener("keydown", i => {
       i.key === "Escape" && !f("dlg").hidden && Mt()
     }), f("btnAddBasket").onclick = () => ki(!1), f("btnClearBasket").onclick = () => {
@@ -10586,4 +10583,86 @@ uniform float uLayerH;`).replace("#include <color_fragment>", `#include <color_f
       t && (t.textContent = K.at ? `На сайте сейчас ставки от ${new Date(K.at).toLocaleString("ru-RU")}` : "На сайте — встроенные ставки калькулятора")
     })
   })
+})();
+
+
+/* ===== Длинные подписи: выравнивание рядов и облачко с полным текстом ===== */
+(() => {
+  const wraps = el => {
+    const r = document.createRange();
+    r.selectNodeContents(el);
+    const tops = new Set([...r.getClientRects()].map(q => Math.round(q.top)));
+    return tops.size > 1
+  };
+  let pend = 0;
+  const fitRows = () => {
+    pend = 0;
+    document.querySelectorAll(".grid").forEach(g => {
+      const lbls = [...g.querySelectorAll(":scope > .field > .lbl, :scope > label.field > .lbl")].filter(l => l.offsetParent);
+      g.classList.remove("lbl-row");
+      if (lbls.length > 1 && lbls.some(wraps)) g.classList.add("lbl-row")
+    })
+  };
+  const schedule = () => { pend || (pend = requestAnimationFrame(fitRows)) };
+  window.addEventListener("resize", schedule);
+  const start = () => {
+    schedule();
+    new MutationObserver(schedule).observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ["class", "hidden"] })
+  };
+  document.readyState === "loading" ? document.addEventListener("DOMContentLoaded", start) : start();
+
+  let tip = null, cur = null, tm = 0;
+  const canvas = document.createElement("canvas").getContext("2d");
+  const ownText = e => [...e.childNodes].some(n => n.nodeType === 3 && n.textContent.trim());
+  const clipped = e => {
+    if (e.tagName === "SELECT") {
+      const o = e.selectedOptions && e.selectedOptions[0];
+      if (!o) return !1;
+      const cs = getComputedStyle(e);
+      canvas.font = cs.font;
+      return canvas.measureText(o.text).width > e.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) - 16
+    }
+    if (!ownText(e)) return !1;
+    const cs = getComputedStyle(e);
+    return e.scrollWidth > e.clientWidth + 1 && (cs.overflowX === "hidden" || cs.textOverflow === "ellipsis")
+  };
+  const find = t => {
+    for (let e = t, i = 0; e && e !== document.body && i < 4; e = e.parentElement, i++) {
+      if (e.nodeType !== 1) continue;
+      if (clipped(e)) return e;
+      if (e.matches(".field, .card, .dialog, section")) break
+    }
+    return null
+  };
+  const text = e => e.tagName === "SELECT" ? e.selectedOptions[0].text : (e.innerText || e.textContent || "").trim();
+  const hide = () => {
+    clearTimeout(tm); cur = null;
+    tip && tip.classList.remove("on")
+  };
+  const show = e => {
+    tip || (tip = document.createElement("div"), tip.className = "lo-tip", tip.setAttribute("role", "tooltip"), document.body.appendChild(tip));
+    tip.textContent = text(e);
+    const r = e.getBoundingClientRect(), w = Math.min(380, innerWidth - 16);
+    tip.style.maxWidth = w + "px";
+    tip.style.left = "0px"; tip.style.top = "0px";
+    tip.classList.add("on");
+    const tw = tip.offsetWidth, th = tip.offsetHeight;
+    let x = Math.max(8, Math.min(r.left, innerWidth - tw - 8)), y = r.bottom + 6;
+    y + th > innerHeight - 8 && (y = Math.max(8, r.top - th - 6));
+    tip.style.left = x + "px"; tip.style.top = y + "px"
+  };
+  document.addEventListener("mouseover", ev => {
+    const e = find(ev.target);
+    if (e === cur) return;
+    hide();
+    if (e) { cur = e; tm = setTimeout(() => cur === e && show(e), 250) }
+  }, !0);
+  document.addEventListener("mouseout", ev => { cur && !cur.contains(ev.relatedTarget) && hide() }, !0);
+  document.addEventListener("focusin", ev => { const e = find(ev.target); e && e.tagName === "SELECT" && (cur = e, show(e)) }, !0);
+  document.addEventListener("focusout", hide, !0);
+  document.addEventListener("scroll", hide, !0);
+  document.addEventListener("touchstart", ev => {
+    const e = find(ev.target);
+    if (e && !e.matches("select, input, textarea")) { cur = e; show(e); clearTimeout(tm); tm = setTimeout(hide, 2500) }
+  }, { passive: !0 })
 })();

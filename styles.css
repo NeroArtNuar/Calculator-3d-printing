@@ -3607,3 +3607,39 @@ textarea {
 /* Панель кнопок над моделью на телефоне листается вбок — затухание справа подсказывает, что там есть ещё кнопки */
 @media (max-width:640px){.ov.bl.more{-webkit-mask-image:linear-gradient(90deg,#000 80%,transparent);mask-image:linear-gradient(90deg,#000 80%,transparent)}}
 .rates-chk ul{margin:4px 0 0;padding-left:18px;font-size:12.5px}.rates-chk p{margin:0}
+
+
+/* ===== Длинные подписи: перенос и облачко с полным текстом ===== */
+.field>.lbl,
+.field>label.lbl {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  overflow-wrap: anywhere
+}
+.lbl-row>.field>.lbl,
+.lbl-row>.field>label.lbl {
+  min-height: 2.5em;
+  display: flex;
+  align-items: flex-end
+}
+.lo-tip {
+  position: fixed;
+  z-index: 300;
+  max-width: min(380px, calc(100vw - 16px));
+  padding: 7px 10px;
+  border-radius: 8px;
+  background: var(--fg);
+  color: var(--bg);
+  font: 500 12.5px/1.4 var(--f-body);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, .28);
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(2px);
+  transition: opacity .12s, transform .12s;
+  white-space: normal
+}
+.lo-tip.on {
+  opacity: 1;
+  transform: none
+}
