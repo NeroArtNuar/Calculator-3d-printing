@@ -3732,3 +3732,7 @@ textarea {
 .lo-view:hover {
   background: rgba(255, 255, 255, .3)
 }
+
+/* кнопка «Очистить стол» */
+.toolbar .clear-bed { color: var(--bad) }
+.toolbar .clear-bed.sure { background: var(--bad); color: #fff }

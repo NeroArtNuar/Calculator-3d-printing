@@ -5970,6 +5970,10 @@ window.__SMETA_SITE__ = 1;
     l.part.name = name.replace(/\.[^.]+$/, ""), l.part.qty = 1, ft(), at(), loNewPart()
   }
   async function loBoot() {
+    if (/[?#&]reset\b/i.test(location.search + location.hash)) {
+      await loDB.del(), nt.del("lo.parts"), history.replaceState(null, "", location.pathname), await Fs("case", !0), setTimeout(() => V("Стол очищен: сохранённые модели удалены"), 400);
+      return
+    }
     const m = await loDB.get();
     if (m && m.parts && m.parts.length) {
       try {
@@ -6628,6 +6632,7 @@ onmessage=e=>{const{id,pos,keys,fdm,light,hull}=e.data;if(hull){try{postMessage(
         return `<button type="button" class="tier ${E===a.qty?"on":""}" data-qty="${E}" title="${E} шт — всего ${Q(k.client)}${k.minApplied?": меньше не берём, это минимальная сумма заказа":""}"><span class="q">${E} шт</span>${k.minApplied?`<span class="p" style="font-size:.8em">до минимума</span><span class="d">${Q(k.client)} за всё</span>`:`<span class="p">${Q(g,g<100?1:0)}</span>`}<span class="d" ${k.minApplied?"hidden":""}>${k.minApplied?"":y>0?"опт −"+S(y,0)+"%":"&nbsp;"}</span></button>`
       }).join("")
     }
+    if (!n && f("basket")) f("basket").innerHTML = "";
     if (n) {
       const W = x => (x.cost - x.prep) * (1 + (+t.markup || 0) / 100) + x.prep * (1 + s.prepMk / 100),
         sw = s.lines.reduce((a, b) => a + W(b.c), 0),
@@ -8866,6 +8871,46 @@ uniform float uLayerH;`).replace("#include <color_fragment>", `#include <color_f
   let loGrp = null,
     loDk = "";
 
+  /* Копии на столе рисуются упрощённой сеткой (до ~6 000 треугольников),
+     иначе 20–100 копий тяжёлой модели вешают видеокарту */
+  function loProxy(g) {
+    const P = g.H.pos, n = P.length / 9;
+    if (n <= 6000) return loGeom(g);
+    if (g.px && g.pxV === g.H.ver) return g.px;
+    g.px && g.px.dispose();
+    let x0 = 1 / 0, y0 = 1 / 0, z0 = 1 / 0, x1 = -1 / 0, y1 = -1 / 0, z1 = -1 / 0;
+    for (let i = 0; i < P.length; i += 3) {
+      const x = P[i], y = P[i + 1], z = P[i + 2];
+      x < x0 && (x0 = x), x > x1 && (x1 = x), y < y0 && (y0 = y), y > y1 && (y1 = y), z < z0 && (z0 = z), z > z1 && (z1 = z)
+    }
+    const run = N => {
+      const c = Math.max(x1 - x0, y1 - y0, z1 - z0, 1e-6) / N,
+        key = i => Math.floor((P[i] - x0) / c) + "," + Math.floor((P[i + 1] - y0) / c) + "," + Math.floor((P[i + 2] - z0) / c),
+        sum = new Map, seen = new Set, T = [];
+      for (let i = 0; i < P.length; i += 3) {
+        const k = key(i);
+        let s = sum.get(k);
+        s || sum.set(k, s = [0, 0, 0, 0]), s[0] += P[i], s[1] += P[i + 1], s[2] += P[i + 2], s[3]++
+      }
+      for (let f = 0; f < n; f++) {
+        const a = key(f * 9), b = key(f * 9 + 3), d = key(f * 9 + 6);
+        if (a === b || b === d || a === d) continue;
+        const u = a < b ? (b < d ? a + "|" + b + "|" + d : a < d ? a + "|" + d + "|" + b : d + "|" + a + "|" + b) : (a < d ? b + "|" + a + "|" + d : b < d ? b + "|" + d + "|" + a : d + "|" + b + "|" + a);
+        seen.has(u) || (seen.add(u), T.push(a, b, d))
+      }
+      return {sum, T}
+    };
+    let N = 64, r = run(N);
+    for (; r.T.length / 3 > 6000 && N > 12;) N = Math.round(N * .7), r = run(N);
+    const o = new Float32Array(r.T.length * 3);
+    r.T.forEach((k, i) => {
+      const s = r.sum.get(k);
+      o[i * 3] = s[0] / s[3], o[i * 3 + 1] = s[1] / s[3], o[i * 3 + 2] = s[2] / s[3]
+    });
+    const q = new THREE.BufferGeometry;
+    return q.setAttribute("position", new THREE.BufferAttribute(o, 3)), q.computeVertexNormals(), g.px = q, g.pxV = g.H.ver, q
+  }
+
   function loGeom(g) {
     return (!g.geom || g.geomV !== g.H.ver) && (g.geom && g.geom.dispose(), g.geom = new THREE.BufferGeometry, g.geom.setAttribute("position", new THREE.BufferAttribute(g.H.pos, 3)), g.geom.computeVertexNormals(), g.geomV = g.H.ver), g.geom
   }
@@ -8918,7 +8963,7 @@ uniform float uLayerH;`).replace("#include <color_fragment>", `#include <color_f
           dimY: 20
         };
       const q = Math.max(1, Math.round(b.qty || 1));
-      for (let c = 0; c < q && it.length < 120; c++) it.push({
+      for (let c = 0; c < q && it.length < 100; c++) it.push({
         id: b.id,
         w: d.dimX + gap,
         h: d.dimY + gap,
@@ -8963,7 +9008,7 @@ uniform float uLayerH;`).replace("#include <color_fragment>", `#include <color_f
         first = !1;
         continue
       }
-      const m = new THREE.Mesh(loGeom(p.g), mt);
+      const m = new THREE.Mesh(loProxy(p.g), mt);
       m.position.set(p.cx - cur.cx, p.cy - cur.cy, 0), m.userData.pid = p.id, loGrp.add(m)
     }
     if (pl.length > 1) {
@@ -10466,7 +10511,7 @@ uniform float uLayerH;`).replace("#include <color_fragment>", `#include <color_f
     }), document.addEventListener("keydown", i => {
       i.key === "Escape" && !f("dlg").hidden && Mt()
     }), f("btnAddBasket").onclick = () => ki(!1), f("btnClearBasket").onclick = () => {
-      l.basket = [], loCur = null, loGeo.forEach(g => g.geom && g.geom.dispose()), loGeo.clear(), at(), typeof loSaveM == "function" && loSaveM(), V("Список заказа очищен — считаем одну деталь")
+      l.basket = [], loCur = null, loGeo.forEach(g => (g.geom && g.geom.dispose(), g.px && g.px.dispose())), loGeo.clear(), at(), typeof loSaveM == "function" && loSaveM(), V("Список заказа очищен — считаем одну деталь")
     }, loKp(), f("leadBtns").addEventListener("click", i => {
       const r = i.target.closest("[data-lead]");
       r && loLeadGo(r.dataset.lead)
@@ -10526,7 +10571,25 @@ uniform float uLayerH;`).replace("#include <color_fragment>", `#include <color_f
     }, f("mbGo").onclick = () => f("sumCard").scrollIntoView({
       behavior: "smooth",
       block: "start"
-    }), f("btnSettings").onclick = ir, f("btnReset").onclick = () => {
+    }), f("btnSettings").onclick = ir, f("btnClearBed").onclick = async () => {
+      const i = f("btnClearBed");
+      if (!i.dataset.sure) {
+        i.dataset.sure = 1, i.classList.add("sure"), i.textContent = "Точно убрать?", V("Нажмите ещё раз — все модели уйдут со стола и из списка заказа"), setTimeout(() => {
+          delete i.dataset.sure, i.classList.remove("sure"), i.textContent = "Очистить стол"
+        }, 3500);
+        return
+      }
+      delete i.dataset.sure, i.classList.remove("sure"), i.textContent = "Очистить стол";
+      l.basket = [], loCur = null, loAllView = !1, loGeo.forEach(g => (g.geom && g.geom.dispose(), g.px && g.px.dispose())), loGeo.clear(), delete loSoloG.px, loGrp && loGrp.clear(), loDk = "", clearTimeout(loSt), await loDB.del(), nt.del("lo.parts"), l.part.qty = 1;
+      const q = f("qtyInp");
+      q && (q.value = 1);
+      try {
+        await Fs("case", !0)
+      } catch (e) {
+        console.error(e)
+      }
+      at(), V("Стол очищен. Загрузите свою модель или перетащите файл")
+    }, f("btnReset").onclick = () => {
       const i = f("btnReset");
       if (!i.dataset.sure) {
         i.dataset.sure = 1, i.style.borderColor = "var(--bad)", i.style.color = "var(--bad)", V("Нажмите ещё раз, чтобы сбросить настройки"), setTimeout(() => {
