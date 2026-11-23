@@ -7239,9 +7239,9 @@ ${(m.shopInfo||"").trim()?`<div class="ft">${J(m.shopInfo.trim())}</div>`:""}
         ["source", "Оценка по модели / данные слайсера", () => Et("#srcSeg")],
         ["quality", "Кнопки качества", () => Et("#presets")],
         ["printer", "Выбор принтера", () => Ht("#printerSel")],
-        ["printerEdit", "Свои профили принтера (✎ +) — только сотрудникам", () => Et("#editPrinter, #addPrinter")],
+        ["printerEdit", "Свои профили принтера (✎ +)", () => Et("#editPrinter, #addPrinter")],
         ["material", "Выбор материала", () => Ht("#matSel")],
-        ["matEdit", "Свои профили материала (✎ +) — только сотрудникам", () => Et("#editMat, #addMat")],
+        ["matEdit", "Свои профили материала (✎ +)", () => Et("#editMat, #addMat")],
         ["nozzle", "Сопло", () => bt("slicer.nozzle")],
         ["layer", "Слой", () => Ht("#layerSel")],
         ["walls", "Стенки", () => bt("slicer.walls")],
@@ -8668,7 +8668,7 @@ uniform float uLayerH;`).replace("#include <color_fragment>", `#include <color_f
         adv: "Расширенный",
         staff: "Сотрудник"
       } [l.mode],
-      on = l.access === "pro" && (l.mode !== "pro" && !!n || Jt);
+      on = !1; /* плашка «Вы смотрите как …» отключена по просьбе владельца */
     b.hidden = !on, on && (f("asBarT").textContent = Jt ? "Вы смотрите как «Друзья»" : `Вы смотрите как «${n}»`)
   }
 
@@ -10031,8 +10031,8 @@ uniform float uLayerH;`).replace("#include <color_fragment>", `#include <color_f
   }
 
   function de(t, e, n) {
-    if (l.mode !== "staff" && l.mode !== "pro") {
-      V("Профили принтеров и материалов меняют сотрудники мастерской");
+    if (l.mode === "simple") {
+      V("Свои принтеры и материалы можно добавить в Расширенном режиме");
       return
     }
     const a = t === "printer",
