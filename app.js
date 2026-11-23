@@ -10406,8 +10406,11 @@ uniform float uLayerH;`).replace("#include <color_fragment>", `#include <color_f
         a = loSa(m),
         v = i.target.checked;
       l.access === "pro" || l.access === "friend" ? (delete loCh[m.id], v === a ? delete m.chamber : m.chamber = v) : v === (m.chamber != null ? !!m.chamber : a) ? delete loCh[m.id] : loCh[m.id] = v, nt.set("lo.chamber", loCh), at()
-    }), f("editPrinter").onclick = () => de("printer", "edit"), f("addPrinter").onclick = () => de("printer", "add"), f("editMat").onclick = () => de("material", "edit"), f("addMat").onclick = () => de("material", "add"), f("dlgClose").onclick = Mt, f("dlg").addEventListener("click", i => {
-      i.target === f("dlg") && Mt()
+    }), f("editPrinter").onclick = () => de("printer", "edit"), f("addPrinter").onclick = () => de("printer", "add"), f("editMat").onclick = () => de("material", "edit"), f("addMat").onclick = () => de("material", "add"), f("dlgClose").onclick = Mt, f("dlg").addEventListener("pointerdown", i => {
+      f("dlg")._bgDown = i.target === f("dlg")
+    }), f("dlg").addEventListener("click", i => {
+      /* закрываем, только если и нажали, и отпустили на фоне — выделение текста с выходом за окно не закрывает его */
+      i.target === f("dlg") && f("dlg")._bgDown && Mt(), f("dlg")._bgDown = !1
     }), document.addEventListener("keydown", i => {
       i.key === "Escape" && !f("dlg").hidden && Mt()
     }), f("btnAddBasket").onclick = () => ki(!1), f("btnClearBasket").onclick = () => {
