@@ -7239,6 +7239,7 @@ ${(m.shopInfo||"").trim()?`<div class="ft">${J(m.shopInfo.trim())}</div>`:""}
         ["source", "Оценка по модели / данные слайсера", () => Et("#srcSeg")],
         ["quality", "Кнопки качества", () => Et("#presets")],
         ["printer", "Выбор принтера", () => Ht("#printerSel")],
+        ["printerEdit", "Свои профили принтера (✎ +) — только сотрудникам", () => Et("#editPrinter, #addPrinter")],
         ["material", "Выбор материала", () => Ht("#matSel")],
         ["matEdit", "Свои профили материала (✎ +) — только сотрудникам", () => Et("#editMat, #addMat")],
         ["nozzle", "Сопло", () => bt("slicer.nozzle")],
@@ -7521,7 +7522,7 @@ ${(m.shopInfo||"").trim()?`<div class="ft">${J(m.shopInfo.trim())}</div>`:""}
     const e = !!li();
     xe("Ключ для публикации на сайт", `<p class="hint">Ключ разрешает калькулятору записывать только файл ставок в ваш репозиторий. Он хранится лишь в этом браузере: на сайт и в файл ставок не попадает.</p>
     <ol class="how"><li>Откройте <b>github.com/settings/personal-access-tokens/new</b> (вы должны быть в своём аккаунте).</li>
-    <li>Token name — «Смета 3D», Expiration — 1 год.</li><li>Repository access → <b>Only select repositories</b> → <b>smeta3d</b>.</li>
+    <li>Token name — «Смета 3D», Expiration — 1 год.</li><li>Repository access → <b>Only select repositories</b> → <b>Calculator-3d-printing</b>.</li>
     <li>Permissions → Repository permissions → <b>Contents: Read and write</b>. Больше ничего не включайте.</li>
     <li>Нажмите <b>Generate token</b>, скопируйте ключ (начинается с github_pat_) и вставьте сюда.</li></ol>
     <label class="field"><span class="lbl">Ключ</span><span class="inp"><input id="ghTok" type="password" autocomplete="off" placeholder="${e?"ключ сохранён — вставьте новый, чтобы заменить":"github_pat_…"}"></span></label>
