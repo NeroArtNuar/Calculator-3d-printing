@@ -526,7 +526,7 @@ details.tp-sec[open]>summary::before {
   position: absolute;
   right: 8px;
   top: 38px;
-  bottom: 52px;
+  bottom: 96px;
   z-index: 4;
   display: flex;
   flex-direction: column;
@@ -570,7 +570,8 @@ details.tp-sec[open]>summary::before {
   vertical-align: -1px
 }
 
-\n@media (max-width:640px) {
+
+@media (max-width:640px) {
   .layer-box {
     bottom: 104px;
     right: 4px
@@ -3651,4 +3652,83 @@ textarea {
   text-decoration: underline dotted;
   text-decoration-color: color-mix(in srgb, currentColor 45%, transparent);
   text-underline-offset: 3px
+}
+
+
+/* ===== Ползунок слоёв: свой вид, одинаковый во всех браузерах (Opera GX рисовала стандартный белый) ===== */
+.layer-box input[type=range] {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  margin: 0
+}
+.layer-box input[type=range]::-webkit-slider-runnable-track {
+  width: 6px;
+  height: 100%;
+  border-radius: 3px;
+  background: linear-gradient(to top, #ff9f1c, #ffbf5c);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, .35)
+}
+.layer-box input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  margin-left: -6px;
+  border-radius: 50%;
+  background: #ff9f1c;
+  border: 2px solid #fff;
+  box-shadow: 0 1px 5px rgba(0, 0, 0, .45)
+}
+.layer-box input[type=range]::-moz-range-track {
+  width: 6px;
+  border-radius: 3px;
+  background: #ff9f1c
+}
+.layer-box input[type=range]::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #ff9f1c;
+  border: 2px solid #fff
+}
+.layer-box input[type=range]:focus-visible::-webkit-slider-thumb {
+  outline: 2px solid #fff;
+  outline-offset: 2px
+}
+
+/* ===== Строка детали в списке заказа: материал не наезжает на количество ===== */
+.bi {
+  flex-wrap: wrap
+}
+.bi .n {
+  flex: 1 1 150px
+}
+.bi .n select {
+  max-width: 100% !important
+}
+.bi > div:last-child {
+  margin-left: auto
+}
+
+/* ===== Список деталей: клик по строке открывает деталь; переключатель вида стола ===== */
+.bi[data-row] {
+  cursor: pointer
+}
+.bi[data-row]:hover {
+  border-color: var(--accent)
+}
+.lo-view {
+  margin-left: 8px;
+  pointer-events: auto;
+  border: 0;
+  border-radius: 5px;
+  padding: 1px 8px;
+  font: inherit;
+  cursor: pointer;
+  background: rgba(255, 255, 255, .18);
+  color: inherit
+}
+.lo-view:hover {
+  background: rgba(255, 255, 255, .3)
 }

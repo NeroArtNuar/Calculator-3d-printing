@@ -6641,7 +6641,7 @@ onmessage=e=>{const{id,pos,keys,fdm,light,hull}=e.data;if(hull){try{postMessage(
       }) => {
         const g = W(k) * M / k.qty,
           y = tt.has(k.tech) ? `${S(E.ml,1)} мл` : `${S(E.grams,1)} г`;
-        return `<div class="bi${E.id===loCur?" cur":""}" data-t="${k.tech}"><div class="n"><b ${loGeo.has(E.id)&&E.id!==loCur?`data-sel="${J(E.id)}" role="button" tabindex="0" style="cursor:pointer;text-decoration:underline dotted" title="Открыть деталь: положение, масштаб, параметры"`:""}>${E.id===loCur?"▸ ":""}${J(E.name)}</b><small><select data-bm="${J(E.id)}" aria-label="Материал позиции" style="font:inherit;max-width:180px">${gn(k.tech).filter(m=>!m.off||m.id===k.mt.id).map(m=>`<option value="${J(m.id)}" ${m.id===k.mt.id?"selected":""}>${J(m.name)}</option>`).join("")}</select> · ${y}${E.gcode?" · G-code":""}${E.chamber?" · камера":""}</small></div><div style="display:flex;align-items:center;gap:6px"><span class="inp" style="width:84px"><input type="number" min="1" max="100000" step="1" inputmode="numeric" value="${k.qty}" data-bq="${J(E.id)}" aria-label="Количество, шт"><em>шт</em></span><span class="p">${mt(g)}/шт</span><button class="btn small ghost" type="button" data-dup="${J(E.id)}" aria-label="Дублировать" title="Дублировать">⧉</button><button class="btn small ghost danger" type="button" data-del="${J(E.id)}" aria-label="Удалить">✕</button></div></div>`
+        return `<div class="bi${E.id===loCur?" cur":""}" data-t="${k.tech}"${loGeo.has(E.id)&&E.id!==loCur?` data-row="${J(E.id)}" title="Открыть эту деталь на столе"`:""}><div class="n"><b ${loGeo.has(E.id)&&E.id!==loCur?`data-sel="${J(E.id)}" role="button" tabindex="0" style="cursor:pointer;text-decoration:underline dotted" title="Открыть деталь: положение, масштаб, параметры"`:""}>${E.id===loCur?"▸ ":""}${J(E.name)}</b><small><select data-bm="${J(E.id)}" aria-label="Материал позиции" style="font:inherit;max-width:180px">${gn(k.tech).filter(m=>!m.off||m.id===k.mt.id).map(m=>`<option value="${J(m.id)}" ${m.id===k.mt.id?"selected":""}>${J(m.name)}</option>`).join("")}</select> · ${y}${E.gcode?" · G-code":""}${E.chamber?" · камера":""}</small></div><div style="display:flex;align-items:center;gap:6px"><span class="inp" style="width:84px"><input type="number" min="1" max="100000" step="1" inputmode="numeric" value="${k.qty}" data-bq="${J(E.id)}" aria-label="Количество, шт"><em>шт</em></span><span class="p">${mt(g)}/шт</span><button class="btn small ghost" type="button" data-dup="${J(E.id)}" aria-label="Дублировать" title="Дублировать">⧉</button><button class="btn small ghost danger" type="button" data-del="${J(E.id)}" aria-label="Удалить">✕</button></div></div>`
       }).join("") + (su > .5 ? `<div class="bi"><div class="n"><b>Подготовка заказа</b><small>приём и подготовка, разово на весь заказ</small></div><span class="p">${Q(su)}</span></div>` : "") + (sx > .5 ? `<div class="bi"><div class="n"><b>Моделирование и упаковка</b><small>на весь заказ</small></div><span class="p">${Q(sx)}</span></div>` : "") + (s.minApplied ? `<div class="bi"><div class="n"><b>До минимальной суммы заказа</b><small>детали стоят ${Q(nm)}, минимум ${Q(s.client)}</small></div><span class="p">${Q(s.client-nm)}</span></div>` : "")
     }
     Ys()
@@ -8870,12 +8870,22 @@ uniform float uLayerH;`).replace("#include <color_fragment>", `#include <color_f
     return (!g.geom || g.geomV !== g.H.ver) && (g.geom && g.geom.dispose(), g.geom = new THREE.BufferGeometry, g.geom.setAttribute("position", new THREE.BufferAttribute(g.H.pos, 3)), g.geom.computeVertexNormals(), g.geomV = g.H.ver), g.geom
   }
 
-  function loBed(t) {
+  function loBed(t, sw) {
     const e = f("loBed");
-    e && (e.hidden = !t, e.textContent = t || "")
+    if (!e) return;
+    e.hidden = !t, e.textContent = t || "";
+    if (t && sw) {
+      const b = document.createElement("button");
+      b.type = "button", b.className = "lo-view", b.textContent = loAllView ? "Только эта деталь" : "Весь заказ";
+      b.title = loAllView ? "Показать на столе только выбранную деталь" : "Показать, как все детали заказа ложатся на столы вместе";
+      b.addEventListener("click", ev => {
+        ev.stopPropagation(), loAllView = !loAllView, loDraw()
+      }), e.appendChild(b)
+    }
   }
 
   const loSoloG = {};
+  let loAllView = !1;
 
   function loDraw() {
     if (!Re || !Lt || typeof THREE > "u") return;
@@ -8888,9 +8898,10 @@ uniform float uLayerH;`).replace("#include <color_fragment>", `#include <color_f
         id: "__solo",
         tech: l.tech,
         qty: Math.max(1, Math.round(+l.part.qty || 1))
-      }] : l.basket.filter(b => loGeo.has(b.id)),
+      }] : l.basket.filter(b => loGeo.has(b.id) && (loAllView || b.id === loCur)),
+      multi = !solo && l.basket.filter(b => loGeo.has(b.id)).length > 1,
       parts = all.filter(b => b.tech === l.tech),
-      k = JSON.stringify([cid, l.tech, pr.id, pr.bedX, pr.bedY, all.map(b => [b.id, b.tech, b.qty, (G(b.id).H || {}).ver])]);
+      k = JSON.stringify([cid, loAllView, l.tech, pr.id, pr.bedX, pr.bedY, all.map(b => [b.id, b.tech, b.qty, (G(b.id).H || {}).ver])]);
     if (k === loDk) return;
     loDk = k;
     for (; loGrp.children.length;) loGrp.remove(loGrp.children[0]);
@@ -8973,7 +8984,7 @@ uniform float uLayerH;`).replace("#include <color_fragment>", `#include <color_f
         }
       })() : null,
       loN = loCi && Number.isFinite(loCi.plates) ? Math.max(1, Math.round(loCi.plates)) : Math.max(1, Math.ceil(loQ / Math.max(1, pl.length)));
-    loBed([solo ? (l.tech === "sls" ? `В камере: ${S(loQ)} шт · ${loN} ${loPl(loN,"запуск","запуска","запусков")} (детали в несколько ярусов)` : `На столе: ${S(Math.min(pl.length, loQ))} из ${S(loQ)} шт` + (loN > 1 ? ` · ${loN} ${loPl(loN,"стол","стола","столов")}` : "")) : `На столе ${Nt[l.tech].name}: ${S(pl.length)} шт` + (over ? `, не поместилось ${S(over)} — пойдут на следующие столы` : ""), os ? `другие технологии — ${os} (выберите деталь в списке)` : ""].filter(Boolean).join(" · ")), zt = !0
+    loBed([solo ? (l.tech === "sls" ? `В камере: ${S(loQ)} шт · ${loN} ${loPl(loN,"запуск","запуска","запусков")} (детали в несколько ярусов)` : `На столе: ${S(Math.min(pl.length, loQ))} из ${S(loQ)} шт` + (loN > 1 ? ` · ${loN} ${loPl(loN,"стол","стола","столов")}` : "")) : `На столе ${Nt[l.tech].name}: ${S(pl.length)}${over ? ` из ${S(pl.length + over)}` : ""} шт` + (over ? ` · ещё ${S(Math.ceil(over / Math.max(1, pl.length)))} ${loPl(Math.ceil(over / Math.max(1, pl.length)),"стол","стола","столов")}` : ""), os ? `другие технологии — ${os} (выберите деталь в списке)` : ""].filter(Boolean).join(" · "), multi), zt = !0
   }
 
   function loPartsInit() {
@@ -10471,7 +10482,12 @@ uniform float uLayerH;`).replace("#include <color_fragment>", `#include <color_f
         return
       }
       const v = i.target.closest("[data-sel]");
-      v && loSelect(v.dataset.sel)
+      if (v) {
+        loSelect(v.dataset.sel);
+        return
+      }
+      const rw = i.target.closest(".bi[data-row]");
+      rw && !i.target.closest("input, select, textarea, button, .inp") && loSelect(rw.dataset.row)
     }), f("basket").addEventListener("change", i => {
       const b = i.target.closest("[data-bm]");
       if (b) {
