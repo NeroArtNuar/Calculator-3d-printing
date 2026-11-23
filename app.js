@@ -6699,7 +6699,7 @@ onmessage=e=>{const{id,pos,keys,fdm,light,hull}=e.data;if(hull){try{postMessage(
         it: E,
         c: k
       }) => a.push(`  ${E.name}: ${mt(W(k)*K0/k.qty)} × ${S(k.qty)} шт`))
-    })()), a.push(`Итого: ${mt(t.client)}${n.tax&&e.vat>0?`, в т.ч. НДС ${e.vat}% ${mt(t.vatAmt)}`:""}`), wi().length && a.push("", "Расчёт по собственным настройкам пользователя, не по параметрам мастерской."), n.discount && +e.minOrder > 0 && l.part.minOn === !1 && a.push("", `Цена указана без минимальной суммы заказа (${mt(t.minClient)}). При оформлении итог будет не меньше этой суммы.`), a.push("", "Расчёт предварительный. Калькулятор «Смета 3D»" + (typeof fe < "u" && fe ? ", neroartnuar.github.io/smeta3d" : "") + "."), a.join(`
+    })()), a.push(`Итого: ${mt(t.client)}${n.tax&&e.vat>0?`, в т.ч. НДС ${e.vat}% ${mt(t.vatAmt)}`:""}`), wi().length && a.push("", "Расчёт по собственным настройкам пользователя, не по параметрам мастерской."), n.discount && +e.minOrder > 0 && l.part.minOn === !1 && a.push("", `Цена указана без минимальной суммы заказа (${mt(t.minClient)}). При оформлении итог будет не меньше этой суммы.`), a.push("", "Расчёт предварительный. Калькулятор «Смета 3D»" + (typeof fe < "u" && fe ? ", neroartnuar.github.io/Calculator-3d-printing" : "") + "."), a.join(`
 `)
   }
   let Ns = !1,
@@ -7128,7 +7128,7 @@ ${(m.shopInfo||"").trim()?`<div class="ft">${J(m.shopInfo.trim())}</div>`:""}
         c: s
       }, i) => e.push(`  ${i+1}. ${o.name} — ${Nt[s.tech].name}, ${s.mt.name}, ${S(s.qty)} шт × ${mt(s.cost*a/s.qty)}`)), e.push("", `Итого: ${mt(t.client)}`), t.minApplied && e.push(`Минимальная сумма заказа — ${mt(t.client)}, стоимость деталей ${mt(t.byMarkup*t.kCl)}`), n.tax && l.money.vat > 0 && e.push(`В том числе НДС ${l.money.vat}%: ${mt(t.vatAmt)}`)
     }
-    return e.push("", At() ? `Срок изготовления: ${At()} ${la(At())} после согласования модели (ориентировочно до ${$n(xn(Date.now(),At()))}).` : l.blocks.schedule && (t.plan.mode !== "none" || t.plan.busy) ? `Срок готовности: ${Rt(t.plan.end)}${t.rush?" (срочный заказ)":""}.` : `Срок изготовления: около ${t.days} раб. дн. после согласования модели.`), (l.money.kpPay || "").trim() && e.push(`Условия оплаты: ${l.money.kpPay.trim()}`), +l.money.kpDays > 0 && e.push(`Предложение действительно до ${new Date(Date.now()+ +l.money.kpDays*864e5).toLocaleDateString("ru-RU")}.`), (l.money.shopInfo || "").trim() && e.push("", l.money.shopInfo.trim()), fe && !(l.money.kpTpl || "").trim() && e.push("", "Расчёт: калькулятор «Смета 3D», neroartnuar.github.io/smeta3d"), (l.money.kpTpl || "").trim() ? loKpFill(l.money.kpTpl, t) : e.join(`
+    return e.push("", At() ? `Срок изготовления: ${At()} ${la(At())} после согласования модели (ориентировочно до ${$n(xn(Date.now(),At()))}).` : l.blocks.schedule && (t.plan.mode !== "none" || t.plan.busy) ? `Срок готовности: ${Rt(t.plan.end)}${t.rush?" (срочный заказ)":""}.` : `Срок изготовления: около ${t.days} раб. дн. после согласования модели.`), (l.money.kpPay || "").trim() && e.push(`Условия оплаты: ${l.money.kpPay.trim()}`), +l.money.kpDays > 0 && e.push(`Предложение действительно до ${new Date(Date.now()+ +l.money.kpDays*864e5).toLocaleDateString("ru-RU")}.`), (l.money.shopInfo || "").trim() && e.push("", l.money.shopInfo.trim()), fe && !(l.money.kpTpl || "").trim() && e.push("", "Расчёт: калькулятор «Смета 3D», neroartnuar.github.io/Calculator-3d-printing"), (l.money.kpTpl || "").trim() ? loKpFill(l.money.kpTpl, t) : e.join(`
 `)
   }
 
@@ -7507,7 +7507,7 @@ ${(m.shopInfo||"").trim()?`<div class="ft">${J(m.shopInfo.trim())}</div>`:""}
       ri(_n[(e + 1) % _n.length][0], !0)
     }
   }
-  const No = "NeroArtNuar/smeta3d",
+  const No = "NeroArtNuar/Calculator-3d-printing",
     Ra = "fdmcalc.ghToken",
     li = () => {
       try {
@@ -7661,7 +7661,7 @@ ${(m.shopInfo||"").trim()?`<div class="ft">${J(m.shopInfo.trim())}</div>`:""}
       }
       throw new Error("GitHub не принял файл, попробуйте ещё раз")
     } catch (s) {
-      const i = /Failed to fetch|NetworkError|Load failed/i.test(s.message) ? "нет связи с GitHub" + (typeof fe < "u" && fe ? "" : " — публикация работает на сайте neroartnuar.github.io/smeta3d") : s.message;
+      const i = /Failed to fetch|NetworkError|Load failed/i.test(s.message) ? "нет связи с GitHub" + (typeof fe < "u" && fe ? "" : " — публикация работает на сайте neroartnuar.github.io/Calculator-3d-printing") : s.message;
       V("Не опубликовано: " + i), /недействителен|нет права/.test(i) && setTimeout(() => Oa(), 400)
     } finally {
       e.disabled = !1, e.textContent = "Опубликовать на сайт"
@@ -8504,7 +8504,7 @@ uniform float uLayerH;`).replace("#include <color_fragment>", `#include <color_f
   }
   async function nr() {
     if (typeof fe > "u" || !fe) return;
-    const t = ["https://raw.githubusercontent.com/NeroArtNuar/smeta3d/main/rates.dat?t=" + Math.floor(Date.now() / 6e4), "rates.dat?t=" + Math.floor(Date.now() / 6e4)];
+    const t = ["https://raw.githubusercontent.com/NeroArtNuar/Calculator-3d-printing/main/rates.dat?t=" + Math.floor(Date.now() / 6e4), "rates.dat?t=" + Math.floor(Date.now() / 6e4)];
     for (const e of t) try {
       const n = await fetch(e, {
         cache: "no-store"
@@ -10244,7 +10244,7 @@ uniform float uLayerH;`).replace("#include <color_fragment>", `#include <color_f
         URL.revokeObjectURL(c.href), c.remove()
       }, 500), V("Файл rates.dat скачан — загрузите его в репозиторий сайта")
     }, f("ratesHow").onclick = () => {
-      xe("Как обновить параметры на сайте", '<p><b>Быстро:</b> нажмите «Опубликовать на сайт». В первый раз калькулятор попросит ключ GitHub и покажет, как его получить (2 минуты). Дальше — одна кнопка.</p><p><b>Вручную:</b></p><ol class="how"><li>Нажмите «Скачать файл ставок» — сохранится <b>rates.dat</b>.</li><li>Откройте <b>github.com/NeroArtNuar/smeta3d</b> и войдите в свой аккаунт.</li><li>«Add file» → «Upload files», перетащите rates.dat, нажмите «Commit changes».</li></ol><p class="hint">Через 1–5 минут все посетители и сотрудники считают по новым ставкам. Пароли, принтеры, материалы и видимость полей обновятся вместе с ними. Менять файл может только владелец аккаунта GitHub — включите на GitHub двухфакторный вход.</p>', '<div class="right"><button class="btn primary" type="button" id="dlgCancel">Понятно</button></div>'), f("dlgCancel").onclick = Mt
+      xe("Как обновить параметры на сайте", '<p><b>Быстро:</b> нажмите «Опубликовать на сайт». В первый раз калькулятор попросит ключ GitHub и покажет, как его получить (2 минуты). Дальше — одна кнопка.</p><p><b>Вручную:</b></p><ol class="how"><li>Нажмите «Скачать файл ставок» — сохранится <b>rates.dat</b>.</li><li>Откройте <b>github.com/NeroArtNuar/Calculator-3d-printing</b> и войдите в свой аккаунт.</li><li>«Add file» → «Upload files», перетащите rates.dat, нажмите «Commit changes».</li></ol><p class="hint">Через 1–5 минут все посетители и сотрудники считают по новым ставкам. Пароли, принтеры, материалы и видимость полей обновятся вместе с ними. Менять файл может только владелец аккаунта GitHub — включите на GitHub двухфакторный вход.</p>', '<div class="right"><button class="btn primary" type="button" id="dlgCancel">Понятно</button></div>'), f("dlgCancel").onclick = Mt
     }, f("engPwSave").onclick = async () => {
       if (l.access !== "pro") {
         V("Пароли меняет только владелец");

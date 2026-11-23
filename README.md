@@ -1,7 +1,7 @@
 # Смета 3D
 
-Калькулятор стоимости 3D-печати: https://neroartnuar.github.io/smeta3d/
-Плагин для OrcaSlicer (FDM): https://neroartnuar.github.io/smeta3d/plugin.html
+Калькулятор стоимости 3D-печати: https://neroartnuar.github.io/Calculator-3d-printing/
+Плагин для OrcaSlicer (FDM): https://neroartnuar.github.io/Calculator-3d-printing/plugin.html
 
 © 2026 Смета 3D. Все права защищены.
 
