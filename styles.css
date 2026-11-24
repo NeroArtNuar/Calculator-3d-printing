@@ -3826,3 +3826,7 @@ textarea {
 .layer-box { align-items: flex-end; right: 10px }
 .layer-box input[type=range] { margin-right: 2px }
 .layer-box .layer-all { align-self: flex-end }
+/* изделие в списке: эскиз корпуса слева */
+.basket-side .bi.bg-h:has(.bi-pic) { display: grid; grid-template-columns: 44px minmax(0, 1fr); column-gap: 10px; row-gap: 6px; align-items: center }
+.basket-side .bi.bg-h:has(.bi-pic) .bi-pic { grid-row: 1 / span 2; width: 44px; height: 44px; align-self: start }
+.basket-side .bi.bg-h:has(.bi-pic) > div:last-child { justify-self: end }

@@ -3420,29 +3420,52 @@ window.__SMETA_SITE__ = 1;
     n.position.set(-250, 150, -200), ye.add(n), Lt = new THREE.Group, Lt.rotation.x = -Math.PI / 2, ye.add(Lt), He = new THREE.Group, ye.add(He), new ResizeObserver(us).observe(t), us();
     const o = new Map;
     let s = 0;
-    t.addEventListener("pointerdown", r => {
+    /* сдвиг вида: правая или средняя кнопка мыши, Shift + левая, двумя пальцами */
+    const pan = (dx, dy) => {
+      const k = pt.r * Math.tan(19 * Math.PI / 180) * 2 / Math.max(200, t.clientHeight || 300),
+        rx = Math.cos(pt.theta), rz = -Math.sin(pt.theta), fx = -Math.sin(pt.theta), fz = -Math.cos(pt.theta),
+        ky = Math.max(.35, Math.abs(Math.cos(pt.phi)));
+      pt.tx = (pt.tx || 0) - rx * dx * k + fx * dy * k / ky, pt.tz = (pt.tz || 0) - rz * dx * k + fz * dy * k / ky
+    };
+    let mid = null;
+    t.addEventListener("contextmenu", r => r.preventDefault()), t.addEventListener("pointerdown", r => {
       t.setPointerCapture(r.pointerId), o.set(r.pointerId, {
         x: r.clientX,
-        y: r.clientY
-      })
+        y: r.clientY,
+        pan: r.button === 1 || r.button === 2 || r.shiftKey
+      }), r.button === 1 && r.preventDefault(), t.classList.toggle("panning", r.button === 1 || r.button === 2 || r.shiftKey), mid = null
     }), t.addEventListener("pointermove", r => {
       if (!o.has(r.pointerId)) return;
       const c = o.get(r.pointerId);
       if (o.set(r.pointerId, {
           x: r.clientX,
-          y: r.clientY
-        }), o.size === 1) pt.theta -= (r.clientX - c.x) * .008, pt.phi = Math.min(Math.PI - .02, Math.max(.02, pt.phi - (r.clientY - c.y) * .008));
+          y: r.clientY,
+          pan: c.pan
+        }), o.size === 1) c.pan ? pan(r.clientX - c.x, r.clientY - c.y) : (pt.theta -= (r.clientX - c.x) * .008, pt.phi = Math.min(Math.PI - .02, Math.max(.02, pt.phi - (r.clientY - c.y) * .008)));
       else if (o.size === 2) {
-        const [d, u] = [...o.values()], p = Math.hypot(d.x - u.x, d.y - u.y);
-        s && (pt.r = Math.min(8e3, Math.max(20, pt.r * s / p))), s = p
+        const [d, u] = [...o.values()], p = Math.hypot(d.x - u.x, d.y - u.y), m = [(d.x + u.x) / 2, (d.y + u.y) / 2];
+        s && (pt.r = Math.min(8e3, Math.max(20, pt.r * s / p))), s = p, mid && pan(m[0] - mid[0], m[1] - mid[1]), mid = m
       }
       ma()
     });
     const i = r => {
-      o.delete(r.pointerId), o.size < 2 && (s = 0)
+      o.delete(r.pointerId), o.size < 2 && (s = 0, mid = null), o.size || t.classList.remove("panning")
     };
     t.addEventListener("pointerup", i), t.addEventListener("pointercancel", i), t.addEventListener("wheel", r => {
-      r.preventDefault(), pt.r = Math.min(8e3, Math.max(20, pt.r * (1 + Math.sign(r.deltaY) * .1))), ma()
+      r.preventDefault();
+      /* приближение к точке под курсором, а не к центру */
+      const k = 1 + Math.sign(r.deltaY) * .1, nr = Math.min(8e3, Math.max(20, pt.r * k));
+      if (nr !== pt.r) {
+        const b = t.getBoundingClientRect(), ray = new THREE.Raycaster;
+        ray.setFromCamera(new THREE.Vector2((r.clientX - b.left) / b.width * 2 - 1, -((r.clientY - b.top) / b.height) * 2 + 1), Fe);
+        const hit = new THREE.Vector3;
+        if (ray.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), -pt.ty), hit) && hit.distanceTo(Fe.position) < pt.r * 6) {
+          const f = 1 - nr / pt.r;
+          pt.tx = (pt.tx || 0) + (hit.x - (pt.tx || 0)) * f, pt.tz = (pt.tz || 0) + (hit.z - (pt.tz || 0)) * f
+        }
+        pt.r = nr
+      }
+      ma()
     }, {
       passive: !1
     }), (function r() {
@@ -6397,8 +6420,8 @@ onmessage=e=>{const{id,pos,keys,fdm,light,hull}=e.data;if(hull){try{postMessage(
   }
 
   /* эскиз детали: настоящая 3D-картинка с освещением (тот же three.js, что и на столе) */
-  function loThumb(P, shells, ref) {
-    const key = shells.map(c => c.tris[0] + ":" + c.tris.length).join(",") + (ref ? "|" + ref.map(Math.round).join(",") : "");
+  function loThumb(P, shells, ref, own) {
+    const key = own ? own.k : shells.map(c => c.tris[0] + ":" + c.tris.length).join(",") + (ref ? "|" + ref.map(Math.round).join(",") : "");
     loThumb.c || (loThumb.c = new Map);
     if (loThumb.c.has(key)) return loThumb.c.get(key);
     let r = "";
@@ -6413,7 +6436,7 @@ onmessage=e=>{const{id,pos,keys,fdm,light,hull}=e.data;if(hull){try{postMessage(
         loThumb.r = { R, sc, d1, d2 }, sc.add(d1), sc.add(d2)
       }
       const { R, sc, d1, d2 } = loThumb.r, g = new THREE.BufferGeometry;
-      const pos = loSplitPos(P, shells);
+      const pos = own ? own.pos : loSplitPos(P, shells);
       g.setAttribute("position", new THREE.BufferAttribute(pos, 3)), g.computeVertexNormals(), g.computeBoundingBox();
       const bb = g.boundingBox, c = bb.getCenter(new THREE.Vector3), sz = bb.getSize(new THREE.Vector3), dm = [sz.x, sz.y, sz.z],
         mi = dm.indexOf(Math.min(...dm)), flat = dm[mi] < .35 * Math.max(...dm),
@@ -6436,6 +6459,22 @@ onmessage=e=>{const{id,pos,keys,fdm,light,hull}=e.data;if(hull){try{postMessage(
     return loThumb.c.set(key, r), r
   }
 
+  function loRowThumb(id) {
+    const g = loGeo.get(id), h = g && g.H;
+    if (!h || !h.pos || h.pos.length < 9) return "";
+    return loThumb(null, null, null, { k: "row:" + id + ":" + h.ver + ":" + h.pos.length, pos: h.pos })
+  }
+
+  /* эскиз изделия целиком: все его детали вместе, как они стоят в файле */
+  function loGroupThumb(gl) {
+    const gs = gl.map(x => loGeo.get(x.it.id)).filter(g => g && g.H && g.H.pos);
+    if (!gs.length) return "";
+    if (gs.length === 1) return loRowThumb(gl[0].it.id);
+    const k = "grp:" + gs.map(g => g.H.ver + ":" + g.H.pos.length).join(","),
+      big = gs.reduce((a, g) => g.H.pos.length > a.H.pos.length ? g : a, gs[0]);
+    return loThumb(null, null, null, { k, pos: big.H.pos })
+  }
+
   function loGap(a, b) {
     let g = 0;
     for (let k = 0; k < 3; k++) g = Math.max(g, a.mn[k] - b.mx[k], b.mn[k] - a.mx[k]);
@@ -6444,10 +6483,38 @@ onmessage=e=>{const{id,pos,keys,fdm,light,hull}=e.data;if(hull){try{postMessage(
 
   /* Раскладка по умолчанию: крупные тела — основа изделия, мелкие прилипают к ближайшей основе,
      мелкие буквы одного изделия собираются в одну «Надпись» */
+  /* понятные названия частей: по форме и по стороне, где деталь стоит на корпусе */
+  function loShape(c, attached) {
+    const d = [...c.dim].sort((a, b) => a - b), box = Math.max(d[0] * d[1] * d[2], 1e-9), fill = c.vol / box;
+    if (d[0] < .15 * d[2]) return d[1] / d[2] > .85 && fill < .35 ? "Кольцо" : attached ? "Накладка" : "Пластина";
+    if (d[0] / d[2] > .8) return attached ? "Вставка" : "Куб";
+    if (d[0] < .35 * d[2]) return "Пластина";
+    return attached ? "Элемент" : "Деталь"
+  }
+
+  function loSide(c, m) {
+    const mc = [0, 1, 2].map(a => (m.mn[a] + m.mx[a]) / 2), cc = [0, 1, 2].map(a => (c.mn[a] + c.mx[a]) / 2),
+      sc = [0, 1, 2].map(a => Math.abs(cc[a] - mc[a]) / Math.max((m.mx[a] - m.mn[a]) / 2, 1e-6)),
+      a = sc.indexOf(Math.max(...sc));
+    return [["слева", "справа"], ["спереди", "сзади"], ["снизу", "сверху"]][a][cc[a] > mc[a] ? 1 : 0]
+  }
+
+  function loDimTxt(shells) {
+    const d = [0, 1, 2].map(a => Math.max(...shells.map(c => c.mx[a])) - Math.min(...shells.map(c => c.mn[a])));
+    return d.map(x => S(x, x < 10 ? 1 : 0)).join(" × ") + " мм"
+  }
+
+  function loNum(list, key) {
+    const cnt = new Map;
+    for (const x of list) cnt.set(key(x), (cnt.get(key(x)) || 0) + 1);
+    const k = new Map;
+    for (const x of list) cnt.get(key(x)) > 1 && (k.set(key(x), (k.get(key(x)) || 0) + 1), x.name = x.base + " " + k.get(key(x)))
+  }
+
   function loSplitPlan(sh) {
     const big = sh[0].vol, isMain = c => c.vol >= Math.max(500, big * .08),
       mains = sh.filter(isMain), smalls = sh.filter(c => !isMain(c)),
-      G = mains.map((m, i) => ({ name: "Изделие " + (i + 1), main: m, att: [] })), loose = [];
+      G = mains.map(m => ({ main: m, att: [] })), loose = [];
     for (const c of smalls) {
       let best = null, bg = 1 / 0;
       for (const g of G) {
@@ -6456,24 +6523,30 @@ onmessage=e=>{const{id,pos,keys,fdm,light,hull}=e.data;if(hull){try{postMessage(
       }
       best && bg <= 1.5 ? best.att.push(c) : loose.push(c)
     }
-    const E = [];
-    let gi = 0;
-    const groups = [];
+    const E = [], groups = [], isTxt = c => Math.max(...c.dim) <= 15;
     for (const g of G) {
       if (!g.att.length) {
-        E.push({ name: "", shells: [g.main], g: -1, main: !0, print: "sep" });
+        const b = loShape(g.main, !1);
+        E.push({ base: b, name: b, shells: [g.main], g: -1, main: !0, print: "sep" });
         continue
       }
-      const id = groups.length;
-      groups.push({ name: "Изделие " + (++gi) });
-      E.push({ name: "Корпус", shells: [g.main], g: id, main: !0, print: "sep" });
-      const letters = g.att.filter(c => Math.max(...c.dim) <= 15), rest = g.att.filter(c => Math.max(...c.dim) > 15);
-      rest.forEach((c, i) => E.push({ name: "Элемент " + (i + 1), shells: [c], g: id, print: "sep" })), letters.length && E.push({ name: "Надпись", shells: letters, g: id, print: "sep" })
+      const id = groups.length, gb = loShape(g.main, !1);
+      groups.push({ base: gb === "Деталь" ? "Изделие" : gb, name: gb === "Деталь" ? "Изделие" : gb });
+      E.push({ base: "Корпус", name: "Корпус", shells: [g.main], g: id, main: !0, print: "sep" });
+      const letters = g.att.filter(isTxt), rest = g.att.filter(c => !isTxt(c)).sort((a, b) => b.vol - a.vol);
+      for (const c of rest) {
+        const b = loShape(c, !0) + " " + loSide(c, g.main);
+        E.push({ base: b, name: b, shells: [c], g: id, print: "sep" })
+      }
+      letters.length && E.push({ base: "Надпись", name: "Надпись", shells: letters, g: id, print: "sep" })
     }
-    const lt = loose.filter(c => Math.max(...c.dim) <= 15), lr = loose.filter(c => Math.max(...c.dim) > 15);
-    lr.forEach(c => E.push({ name: "", shells: [c], g: -1, print: "sep" })), lt.length && E.push({ name: "Надпись", shells: lt, g: -1, print: "sep" });
-    let k = 0;
-    for (const e of E) e.name || (e.name = "Деталь " + ++k);
+    for (const c of loose.filter(c => !isTxt(c))) {
+      const b = loShape(c, !1);
+      E.push({ base: b, name: b, shells: [c], g: -1, print: "sep" })
+    }
+    const lt = loose.filter(isTxt);
+    lt.length && E.push({ base: "Надпись", name: "Надпись", shells: lt, g: -1, print: "sep" });
+    loNum(groups, x => x.base), loNum(E, x => x.g + "|" + x.base);
     return { groups, E }
   }
 
@@ -6511,7 +6584,7 @@ onmessage=e=>{const{id,pos,keys,fdm,light,hull}=e.data;if(hull){try{postMessage(
           const es = plan.E.map((e, i) => [e, i]).filter(([e]) => e.g === gi);
           if (!es.length) return;
           rows.push(`<div class="sp-g">${gi>=0?`<input class="sp-gn" data-gn="${gi}" value="${J(plan.groups[gi].name)}" aria-label="Название изделия">`:`<b>${title}</b>`}</div>`);
-          for (const [e, i] of es) rows.push(`<div class="sp-e"><img class="sp-pic" alt="" src="${loThumb(P, e.shells, loRef(e))}"><input data-en="${i}" value="${J(e.name)}" aria-label="Название детали"><small>${S(vol(e),1)} см³${e.shells.length>1?` · ${e.shells.length} ${loPl(e.shells.length,"тело","тела","тел")}`:""}</small><select data-eg="${i}" aria-label="Изделие">${gOpt(e.g)}</select>${e.g>=0&&!e.main?`<select data-ep="${i}" aria-label="Как печатать"><option value="sep"${e.print==="sep"?" selected":""}>печатать отдельно</option><option value="in"${e.print==="in"?" selected":""}>вместе с корпусом</option></select>`:`<span class="sp-ph">${e.g>=0?"основа":""}</span>`}</div>`)
+          for (const [e, i] of es) rows.push(`<div class="sp-e"><img class="sp-pic" alt="" src="${loThumb(P, e.shells, loRef(e))}"><input data-en="${i}" value="${J(e.name)}" aria-label="Название детали"><small>${loDimTxt(e.shells)}<br>${S(vol(e),1)} см³${e.shells.length>1?` · ${e.shells.length} ${loPl(e.shells.length,"тело","тела","тел")}`:""}</small><select data-eg="${i}" aria-label="Изделие">${gOpt(e.g)}</select>${e.g>=0&&!e.main?`<select data-ep="${i}" aria-label="Как печатать"><option value="sep"${e.print==="sep"?" selected":""}>печатать отдельно</option><option value="in"${e.print==="in"?" selected":""}>вместе с корпусом</option></select>`:`<span class="sp-ph">${e.g>=0?"основа":""}</span>`}</div>`)
         };
         plan.groups.forEach((g, i) => block(i)), block(-1, "Отдельные детали");
         f("dlgBody").innerHTML = `<p class="sub">В файле ${S(sh.length)} ${loPl(sh.length,"отдельное тело","отдельных тела","отдельных тел")}. Мелкие части привязаны к ближайшей крупной — это изделие. Буквы одного изделия собраны в «Надпись». Проверьте и поправьте: название, к какому изделию относится, как печатать.</p><div class="sp-list">${rows.join("")}</div><p class="sub">«Вместе с корпусом» — деталь печатается в одном задании с корпусом (например, другим цветом): её пластик и время войдут в цену корпуса. «Отдельно» — своя строка в заказе, её можно положить на стол отдельно и выбрать ей материал.</p>`
@@ -6551,11 +6624,13 @@ onmessage=e=>{const{id,pos,keys,fdm,light,hull}=e.data;if(hull){try{postMessage(
           tw.qty++;
           continue
         }
-        const x = { name: e.name.trim(), shells: e.shells, qty: 1 };
+        const x = { name: e.name.trim(), shells: e.shells, qty: 1, base: e.base, auto: e.base && e.name.trim().replace(/ \d+$/, "") === e.base };
         key && seen.set(key, x), todo.push(x)
       }
-      let dn = 0;
-      for (const x of todo) /^Деталь \d+$/.test(x.name) && (x.name = "Деталь " + ++dn);
+      {
+        const au = todo.filter(x => !x.grp && x.auto);
+        au.forEach(x => x.name = x.base), loNum(au, x => x.base)
+      }
       try {
         for (const [i, x] of todo.entries()) {
           it(!0, `Считаю детали: ${i + 1} из ${todo.length} — ${x.gname ? x.gname + " · " : ""}${x.name}`), await kt(), await loAddGeom(loSplitPos(P, x.shells), x.name);
@@ -7018,11 +7093,13 @@ onmessage=e=>{const{id,pos,keys,fdm,light,hull}=e.data;if(hull){try{postMessage(
           seenG.add(E.grp);
           const gl = s.lines.filter(x => x.it.grp === E.grp), gq = +E.gq || 1,
             sum = gl.reduce((a, x) => a + W(x.c) * M, 0), gr = gl.reduce((a, x) => a + (tt.has(x.c.tech) ? 0 : (+x.it.grams || 0) * (+x.it.per || 1)), 0);
-          hd = `<div class="bi bg-h"><div class="n"><b>${J(E.gname||"Изделие")}</b><small>изделие · ${gl.length} ${loPl(gl.length,"деталь","детали","деталей")}${gr>0?` · ${S(gr,0)} г на 1 шт`:""}</small></div><div style="display:flex;align-items:center;gap:6px"><span class="inp" style="width:84px"><input type="number" min="1" max="100000" step="1" inputmode="numeric" value="${gq}" data-gq="${J(E.grp)}" aria-label="Количество изделий, шт"><em>шт</em></span><span class="p">${mt(sum/gq)}/шт</span><button class="btn small ghost" type="button" data-gren="${J(E.grp)}" aria-label="Переименовать изделие" title="Переименовать изделие">✎</button><button class="btn small ghost danger" type="button" data-gdel="${J(E.grp)}" aria-label="Удалить изделие" title="Удалить изделие со всеми деталями">✕</button></div></div>`
+          const gp = loGroupThumb(gl);
+          hd = `<div class="bi bg-h">${gp?`<img class="bi-pic" src="${gp}" alt="">`:""}<div class="n"><b>${J(E.gname||"Изделие")}</b><small>изделие · ${gl.length} ${loPl(gl.length,"деталь","детали","деталей")}${gr>0?` · ${S(gr,0)} г на 1 шт`:""}</small></div><div style="display:flex;align-items:center;gap:6px"><span class="inp" style="width:84px"><input type="number" min="1" max="100000" step="1" inputmode="numeric" value="${gq}" data-gq="${J(E.grp)}" aria-label="Количество изделий, шт"><em>шт</em></span><span class="p">${mt(sum/gq)}/шт</span><button class="btn small ghost" type="button" data-gren="${J(E.grp)}" aria-label="Переименовать изделие" title="Переименовать изделие">✎</button><button class="btn small ghost danger" type="button" data-gdel="${J(E.grp)}" aria-label="Удалить изделие" title="Удалить изделие со всеми деталями">✕</button></div></div>`
         }
         const g = W(k) * M / k.qty,
           y = tt.has(k.tech) ? `${S(E.ml,1)} мл` : `${S(E.grams,1)} г`;
-        return hd + `<div class="bi${E.grp?" bi-sub":""}${E.id===loCur?" cur":""}" data-t="${k.tech}"${loGeo.has(E.id)&&E.id!==loCur?` data-row="${J(E.id)}" title="Открыть эту деталь на столе"`:""}><div class="n"><b ${loGeo.has(E.id)&&E.id!==loCur?`data-sel="${J(E.id)}" role="button" tabindex="0" style="cursor:pointer;text-decoration:underline dotted" title="Открыть деталь: положение, масштаб, параметры"`:""}>${E.id===loCur?"▸ ":""}${J(E.name)}</b><small><select data-bm="${J(E.id)}" aria-label="Материал позиции" style="font:inherit;max-width:180px">${gn(k.tech).filter(m=>!m.off||m.id===k.mt.id).map(m=>`<option value="${J(m.id)}" ${m.id===k.mt.id?"selected":""}>${J(m.name)}</option>`).join("")}</select> · ${y}${E.gcode?" · G-code":""}${E.chamber?" · камера":""}${E.incl&&E.incl.length?` · в составе: ${J(E.incl.join(", "))}`:""}</small></div><div style="display:flex;align-items:center;gap:6px"><span class="inp" style="width:84px"${E.grp?` title="Всего на заказ: по ${S(+E.per||1)} на изделие"`:""}><input type="number" min="1" max="100000" step="1" inputmode="numeric" value="${k.qty}" data-bq="${J(E.id)}" aria-label="Количество, шт"><em>шт</em></span><span class="p">${mt(g)}/шт</span><button class="btn small ghost" type="button" data-dup="${J(E.id)}" aria-label="Дублировать" title="Дублировать">⧉</button><button class="btn small ghost danger" type="button" data-del="${J(E.id)}" aria-label="Удалить">✕</button></div></div>`
+        const pic = loGeo.has(E.id) ? loRowThumb(E.id) : "";
+        return hd + `<div class="bi${E.grp?" bi-sub":""}${E.id===loCur?" cur":""}" data-t="${k.tech}"${loGeo.has(E.id)&&E.id!==loCur?` data-row="${J(E.id)}" title="Открыть эту деталь на столе"`:""}>${pic?`<img class="bi-pic" src="${pic}" alt="">`:""}<div class="n"><b ${loGeo.has(E.id)&&E.id!==loCur?`data-sel="${J(E.id)}" role="button" tabindex="0" style="cursor:pointer;text-decoration:underline dotted" title="Открыть деталь: положение, масштаб, параметры"`:""}>${E.id===loCur?"▸ ":""}${J(E.name)}</b><small><select data-bm="${J(E.id)}" aria-label="Материал позиции" style="font:inherit;max-width:180px">${gn(k.tech).filter(m=>!m.off||m.id===k.mt.id).map(m=>`<option value="${J(m.id)}" ${m.id===k.mt.id?"selected":""}>${J(m.name)}</option>`).join("")}</select> · ${y}${E.gcode?" · G-code":""}${E.chamber?" · камера":""}${E.incl&&E.incl.length?` · в составе: ${J(E.incl.join(", "))}`:""}</small></div><div style="display:flex;align-items:center;gap:6px"><span class="inp" style="width:84px"${E.grp?` title="Всего на заказ: по ${S(+E.per||1)} на изделие"`:""}><input type="number" min="1" max="100000" step="1" inputmode="numeric" value="${k.qty}" data-bq="${J(E.id)}" aria-label="Количество, шт"><em>шт</em></span><span class="p">${mt(g)}/шт</span><button class="btn small ghost" type="button" data-dup="${J(E.id)}" aria-label="Дублировать" title="Дублировать">⧉</button><button class="btn small ghost danger" type="button" data-del="${J(E.id)}" aria-label="Удалить">✕</button></div></div>`
       }).join("") + (su > .5 ? `<div class="bi"><div class="n"><b>Подготовка заказа</b><small>приём и подготовка, разово на весь заказ</small></div><span class="p">${Q(su)}</span></div>` : "") + (sx > .5 ? `<div class="bi"><div class="n"><b>Моделирование и упаковка</b><small>на весь заказ</small></div><span class="p">${Q(sx)}</span></div>` : "") + (s.minApplied ? `<div class="bi"><div class="n"><b>До минимальной суммы заказа</b><small>детали стоят ${Q(nm)}, минимум ${Q(s.client)}</small></div><span class="p">${Q(s.client-nm)}</span></div>` : "")
     }
     Ys()
