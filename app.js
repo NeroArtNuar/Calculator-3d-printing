@@ -251,7 +251,7 @@ window.__SMETA_SITE__ = 1;
       machineS: P,
       chamberC: k,
       bed: b,
-      objects: F,
+      objects: loMergeObj(F),
       overheadG: Math.max(0, x.reduce((w, T) => w + T.grams, 0) - Object.values(j).reduce((w, T) => w + T, 0)),
       orcaCost: +n(/^; total filament cost\s*=\s*([\d.]+)/m) || (x.some(w => w.orcaCost) ? x.reduce((w, T) => w + (T.orcaCost || 0), 0) : null),
       printer: (a("printer_settings_id") || "").replace(/^"|"$/g, ""),
@@ -3816,7 +3816,7 @@ window.__SMETA_SITE__ = 1;
   }
 
   function pa(t, e, n, a) {
-    t > 0 && (l.manual.g = +t.toFixed(2)), e && (l.manual.h = Math.floor(e / 3600), l.manual.m = Math.round(e % 3600 / 60), l.manual.m === 60 && (l.manual.h++, l.manual.m = 0)), l.tech !== "fdm" && Ve("fdm", !0), Ge("manual"), ft(), f("manualNote").textContent = `Из ${n}: ${t?S(t,1)+" г":"вес не найден"}, ${e?vt(e):"время не найдено"}${a?", "+a:""}. Если на столе несколько деталей, это расход на весь стол.`
+    t > 0 && (l.manual.g = +t.toFixed(2)), e && (l.manual.h = Math.floor(e / 3600), l.manual.m = e < 1800 ? Math.round(e % 3600 / 60 * 100) / 100 : Math.round(e % 3600 / 60), l.manual.m >= 60 && (l.manual.h++, l.manual.m = 0)), l.tech !== "fdm" && Ve("fdm", !0), Ge("manual"), ft(), f("manualNote").textContent = `Из ${n}: ${t?S(t,1)+" г":"вес не найден"}, ${e?vt(e):"время не найдено"}${a?", "+a:""}. Если на столе несколько деталей, это расход на весь стол.`
   }
   async function loG3(n, o) {
     try {
@@ -3938,6 +3938,11 @@ window.__SMETA_SITE__ = 1;
       it(!1)
     }
     const a = n.chamberC > 0;
+    let pr0 = "";
+    {
+      const pp = loPrinterBy(n.model) || loPrinterBy(n.printer);
+      pp && l.tech === "fdm" && (l.sel.fdm.printer = pp.id, pr0 = ", принтер " + pp.name)
+    }
     if (n.objects.length > 1 && l.blocks.basket && document.body.classList.contains("money")) {
       const o = ht(),
         s = Ct(),
@@ -3973,7 +3978,10 @@ window.__SMETA_SITE__ = 1;
         g = y && gn("fdm").find(q => fi(q.name) === fi(y)) || y && gn("fdm").find(q => fi(q.name).startsWith(fi(y)));
       g ? (l.sel.fdm.material = g.id, mt0 = ", материал " + g.name) : y && (mt0 = `, материала «${y}» нет в списке — выберите вручную`)
     }
-    loGc = t.name, pa(n.grams, n.machineS, t.name, a ? `камера ${S(n.chamberC)} °C` : ""), l.part.name = e, ue(), V(n.grams || n.machineS ? `Расчёт по G-code: ${t.name}${mt0}` : `${t.name}: в файле нет сводки слайсера`)
+    /* на столе несколько копий одной детали: в G-code вес и время за весь стол — делим на штуки */
+    const cp = n.objects.length === 1 ? Math.max(1, n.objects[0].copies) : 1;
+    cp > 1 ? (pa(n.grams / cp, n.machineS / cp, t.name, a ? `камера ${S(n.chamberC)} °C` : ""), l.part.qty = cp, l.part.perPlate = cp, l.part.ppGc = 1, ft()) : pa(n.grams, n.machineS, t.name, a ? `камера ${S(n.chamberC)} °C` : "");
+    loGc = t.name, l.part.name = e, ue(), V(n.grams || n.machineS ? `Расчёт по G-code: ${t.name}${mt0}${pr0}${cp > 1 ? ` · на столе ${S(cp)} шт — вес и время поделены на штуку` : ""}` : `${t.name}: в файле нет сводки слайсера`)
   }
   let loGc = null;
   const ze = {
@@ -6123,6 +6131,7 @@ onmessage=e=>{const{id,pos,keys,fdm,light,hull}=e.data;if(hull){try{postMessage(
     return r.st
   }
   async function Zt(t, e) {
+    l.part.ppGc && (l.part.perPlate = 0, l.part.ppGc = 0);
     je(!0), it(!0), await kt(), tn(t);
     const n = await loVn(t);
     t = n.pos;
@@ -7283,6 +7292,34 @@ onmessage=e=>{const{id,pos,keys,fdm,light,hull}=e.data;if(hull){try{postMessage(
     }
   }
 
+  /* G-code: одинаковые модели, расставленные отдельными объектами (id_0, id_1…), — это копии одной детали */
+  function loMergeObj(F) {
+    const base = s => String(s || "").replace(/(_id_\d+_copy_\d+|\s*\(\d+\)|_\d+|-\d+|\s+\d+)$/i, "").trim().toLowerCase(),
+      out = [];
+    for (const o of F) {
+      const per = o.grams / Math.max(1, o.copies), tw = out.find(q => q._b === base(o.name) && Math.abs(q.grams / q.copies - per) <= Math.max(.05, per * .04));
+      if (!tw) {
+        out.push({ ...o, _b: base(o.name) });
+        continue
+      }
+      tw.copies += o.copies, tw.grams += o.grams, tw.timeS += o.timeS, tw.gramsBySlot = tw.gramsBySlot.map((g, i) => g + (o.gramsBySlot[i] || 0)), Object.assign(tw.boxes, o.boxes)
+    }
+    return out.map(({ _b, ...o }) => o)
+  }
+
+  /* принтер из G-code: «Creatbot d600 pro 3 hs» → «CreatBot D600 Pro3 HS» */
+  function loPrinterBy(model) {
+    const tok = s => String(s || "").toLowerCase().replace(/([a-z])(\d)/g, "$1 $2").replace(/(\d)([a-z])/g, "$1 $2").split(/[^a-zа-я0-9]+/).filter(x => x && !/^(bambu|lab|nozzle|mm)$/.test(x)),
+      m = tok(model);
+    if (m.length < 2) return null;
+    let best = null, bs = 0;
+    for (const p of Qe(yn())) {
+      const pt = tok(p.name), sc = m.filter(x => pt.includes(x)).length / Math.max(m.length, pt.length);
+      sc > bs && (bs = sc, best = p)
+    }
+    return bs >= .6 ? best : null
+  }
+
   function loPl(n, a, b, c) {
     n = Math.abs(Math.round(n));
     const e = n % 10,
@@ -7759,7 +7796,7 @@ ${(m.shopInfo||"").trim()?`<div class="ft">${J(m.shopInfo.trim())}</div>`:""}
     f("manH").addEventListener("input", e => {
       t().h = Math.max(0, parseFloat(e.target.value) || 0), at()
     }), f("manM").addEventListener("input", e => {
-      t().m = Math.min(59, Math.max(0, parseFloat(e.target.value) || 0)), at()
+      t().m = Math.min(59.99, Math.max(0, parseFloat(e.target.value) || 0)), at()
     })
   }
   const Vs = [
