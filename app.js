@@ -6364,33 +6364,43 @@ onmessage=e=>{const{id,pos,keys,fdm,light,hull}=e.data;if(hull){try{postMessage(
     return [...cm.values()].map(c => (c.vol = Math.abs(c.vol), c.dim = [0, 1, 2].map(a => c.mx[a] - c.mn[a]), c)).sort((a, b) => b.vol - a.vol)
   }
 
-  /* маленький эскиз детали: проекция на её самую широкую плоскость */
-  function loThumb(P, shells) {
-    const key = shells.map(c => c.tris[0] + ":" + c.tris.length).join(",");
+  /* эскиз детали: настоящая 3D-картинка с освещением (тот же three.js, что и на столе) */
+  function loThumb(P, shells, ref) {
+    const key = shells.map(c => c.tris[0] + ":" + c.tris.length).join(",") + (ref ? "|" + ref.map(Math.round).join(",") : "");
     loThumb.c || (loThumb.c = new Map);
     if (loThumb.c.has(key)) return loThumb.c.get(key);
-    const mn = [0, 1, 2].map(a => Math.min(...shells.map(c => c.mn[a]))), mx = [0, 1, 2].map(a => Math.max(...shells.map(c => c.mx[a]))),
-      d = [0, 1, 2].map(a => mx[a] - mn[a]), z = d.indexOf(Math.min(...d)), [u, v] = [0, 1, 2].filter(a => a !== z),
-      W = 56, s = (W - 6) / Math.max(d[u], d[v], 1e-6), ox = (W - d[u] * s) / 2, oy = (W - d[v] * s) / 2,
-      cv = document.createElement("canvas");
-    cv.width = cv.height = W;
-    const x = cv.getContext("2d");
-    x.fillStyle = "#f59e0b", x.strokeStyle = "#f59e0b", x.lineWidth = .6;
-    let all = 0;
-    for (const c of shells) all += c.tris.length;
-    const step = Math.max(1, Math.floor(all / 25e3));
-    x.beginPath();
-    for (const c of shells)
-      for (let i = 0; i < c.tris.length; i += step) {
-        const o = c.tris[i] * 9;
-        for (let k = 0; k < 3; k++) {
-          const px = ox + (P[o + k * 3 + u] - mn[u]) * s, py = W - oy - (P[o + k * 3 + v] - mn[v]) * s;
-          k ? x.lineTo(px, py) : x.moveTo(px, py)
-        }
-        x.closePath()
+    let r = "";
+    try {
+      const W = 128;
+      if (!loThumb.r) {
+        const R = new THREE.WebGLRenderer({ antialias: !0, alpha: !0, preserveDrawingBuffer: !0 });
+        R.setPixelRatio(1), R.setSize(W, W), R.setClearColor(0, 0);
+        const sc = new THREE.Scene;
+        sc.add(new THREE.HemisphereLight(16777215, 9211020, .6));
+        const d1 = new THREE.DirectionalLight(16777215, .8), d2 = new THREE.DirectionalLight(16777215, .45);
+        loThumb.r = { R, sc, d1, d2 }, sc.add(d1), sc.add(d2)
       }
-    x.fill(), x.stroke();
-    const r = cv.toDataURL();
+      const { R, sc, d1, d2 } = loThumb.r, g = new THREE.BufferGeometry;
+      const pos = loSplitPos(P, shells);
+      g.setAttribute("position", new THREE.BufferAttribute(pos, 3)), g.computeVertexNormals(), g.computeBoundingBox();
+      const bb = g.boundingBox, c = bb.getCenter(new THREE.Vector3), sz = bb.getSize(new THREE.Vector3), dm = [sz.x, sz.y, sz.z],
+        mi = dm.indexOf(Math.min(...dm)), flat = dm[mi] < .35 * Math.max(...dm),
+        dir = new THREE.Vector3;
+      if (flat) {
+        dir.setComponent(mi, ref ? (c.getComponent(mi) >= ref[mi] ? 1 : -1) : 1);
+        const up = mi === 2 ? new THREE.Vector3(0, -1, 0) : new THREE.Vector3(0, 0, 1), side = new THREE.Vector3().crossVectors(dir, up);
+        dir.addScaledVector(up, -.45).addScaledVector(side, .25).normalize()
+      } else dir.set(.8, -1, .75).normalize();
+      const rad = sz.length() / 2 || 1, cam = new THREE.OrthographicCamera(-rad, rad, rad, -rad, .01, rad * 10);
+      cam.up.set(0, 0, 1), flat && mi === 2 && cam.up.set(0, 1, 0), cam.position.copy(c).addScaledVector(dir, rad * 4), cam.lookAt(c);
+      const k = 1.04;
+      cam.left *= k, cam.right *= k, cam.top *= k, cam.bottom *= k, cam.updateProjectionMatrix();
+      d1.position.copy(c).add(dir.clone().multiplyScalar(2).add(new THREE.Vector3(1.2, -.6, 2)).multiplyScalar(rad)), d2.position.copy(c).add(dir.clone().multiplyScalar(2).add(new THREE.Vector3(-1.5, 1, -.5)).multiplyScalar(rad));
+      const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: 0xd98a3d, roughness: .6, metalness: .05, side: THREE.DoubleSide }));
+      sc.add(m), R.render(sc, cam), r = R.domElement.toDataURL("image/png"), sc.remove(m), g.dispose(), m.material.dispose()
+    } catch (e) {
+      console.error(e)
+    }
     return loThumb.c.set(key, r), r
   }
 
@@ -6458,6 +6468,10 @@ onmessage=e=>{const{id,pos,keys,fdm,light,hull}=e.data;if(hull){try{postMessage(
     if (sh.length < 2) return V("Модель цельная — разбивать нечего");
     const P = H.pos, src = loCur, base = (l.part.name || H.name || "Сборка").replace(/\.[^.]+$/, ""),
       plan = loSplitPlan(sh), vol = e => e.shells.reduce((a, c) => a + c.vol, 0) / 1e3,
+      loRef = e => {
+        const m = !e.main && e.g >= 0 && plan.E.find(x => x.g === e.g && x.main);
+        return m ? [0, 1, 2].map(a => (Math.min(...m.shells.map(c => c.mn[a])) + Math.max(...m.shells.map(c => c.mx[a]))) / 2) : null
+      },
       gOpt = sel => `<option value="-1"${sel===-1?" selected":""}>Отдельная деталь</option>` + plan.groups.map((g, i) => `<option value="${i}"${sel===i?" selected":""}>${J(g.name)}</option>`).join(""),
       draw = () => {
         const rows = [];
@@ -6465,7 +6479,7 @@ onmessage=e=>{const{id,pos,keys,fdm,light,hull}=e.data;if(hull){try{postMessage(
           const es = plan.E.map((e, i) => [e, i]).filter(([e]) => e.g === gi);
           if (!es.length) return;
           rows.push(`<div class="sp-g">${gi>=0?`<input class="sp-gn" data-gn="${gi}" value="${J(plan.groups[gi].name)}" aria-label="Название изделия">`:`<b>${title}</b>`}</div>`);
-          for (const [e, i] of es) rows.push(`<div class="sp-e"><img class="sp-pic" alt="" src="${loThumb(P, e.shells)}"><input data-en="${i}" value="${J(e.name)}" aria-label="Название детали"><small>${S(vol(e),1)} см³${e.shells.length>1?` · ${e.shells.length} ${loPl(e.shells.length,"тело","тела","тел")}`:""}</small><select data-eg="${i}" aria-label="Изделие">${gOpt(e.g)}</select>${e.g>=0&&!e.main?`<select data-ep="${i}" aria-label="Как печатать"><option value="sep"${e.print==="sep"?" selected":""}>печатать отдельно</option><option value="in"${e.print==="in"?" selected":""}>вместе с корпусом</option></select>`:`<span class="sp-ph">${e.g>=0?"основа":""}</span>`}</div>`)
+          for (const [e, i] of es) rows.push(`<div class="sp-e"><img class="sp-pic" alt="" src="${loThumb(P, e.shells, loRef(e))}"><input data-en="${i}" value="${J(e.name)}" aria-label="Название детали"><small>${S(vol(e),1)} см³${e.shells.length>1?` · ${e.shells.length} ${loPl(e.shells.length,"тело","тела","тел")}`:""}</small><select data-eg="${i}" aria-label="Изделие">${gOpt(e.g)}</select>${e.g>=0&&!e.main?`<select data-ep="${i}" aria-label="Как печатать"><option value="sep"${e.print==="sep"?" selected":""}>печатать отдельно</option><option value="in"${e.print==="in"?" selected":""}>вместе с корпусом</option></select>`:`<span class="sp-ph">${e.g>=0?"основа":""}</span>`}</div>`)
         };
         plan.groups.forEach((g, i) => block(i)), block(-1, "Отдельные детали");
         f("dlgBody").innerHTML = `<p class="sub">В файле ${S(sh.length)} ${loPl(sh.length,"отдельное тело","отдельных тела","отдельных тел")}. Мелкие части привязаны к ближайшей крупной — это изделие. Буквы одного изделия собраны в «Надпись». Проверьте и поправьте: название, к какому изделию относится, как печатать.</p><div class="sp-list">${rows.join("")}</div><p class="sub">«Вместе с корпусом» — деталь печатается в одном задании с корпусом (например, другим цветом): её пластик и время войдут в цену корпуса. «Отдельно» — своя строка в заказе, её можно положить на стол отдельно и выбрать ей материал.</p>`
