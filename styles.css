@@ -3798,9 +3798,31 @@ textarea {
 @media (max-width:760px) { .basket-side .basket { max-height: 420px } }
 .basket-side .bi { flex-wrap: nowrap; gap: 8px }
 .basket-side .bi .n { flex: 1 1 auto; min-width: 0 }
-.basket-side .bi .n b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.basket-side .bi .n b { display: block; white-space: normal; overflow-wrap: anywhere; line-height: 1.25 }
 .basket-side .bi .n select { max-width: 118px !important }
 .basket-side .bi .inp { width: 66px !important }
 .basket-side .bi.bi-sub { margin-left: 14px }
 .basket input[type=number] { -moz-appearance: textfield; appearance: textfield }
 .basket input[type=number]::-webkit-inner-spin-button, .basket input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0 }
+
+/* эскиз детали в списке заказа */
+.bi-pic { width: 40px; height: 40px; flex: 0 0 40px; border-radius: 7px; background: radial-gradient(circle at 50% 40%, #ffffff 0%, #e2e6ea 100%); border: 1px solid rgba(127, 127, 127, .25); object-fit: contain; align-self: center }
+.bi.cur .bi-pic { outline: 2px solid var(--accent, #f5a524); outline-offset: 1px }
+
+/* просмотр ещё крупнее, список — во всю высоту рядом */
+.viewer-wrap { height: 600px }
+.model-grid { grid-template-columns: minmax(0, 1.6fr) minmax(330px, 1fr) }
+.basket-side .basket { max-height: 470px }
+@media (max-width:760px) { .viewer-wrap { height: 420px } .model-grid { grid-template-columns: 1fr } }
+@media (max-width:520px) { .viewer-wrap { height: 360px } }
+#viewer.panning { cursor: move }
+/* строка детали со значком: значок слева, справа название и материал, под ними количество и цена */
+.basket-side .bi:has(.bi-pic) { display: grid; grid-template-columns: 44px minmax(0, 1fr); column-gap: 10px; row-gap: 6px; align-items: center }
+.basket-side .bi:has(.bi-pic) .bi-pic { grid-row: 1 / span 2; width: 44px; height: 44px; align-self: start }
+.basket-side .bi:has(.bi-pic) .n select { max-width: 100% !important; width: 100% }
+.basket-side .bi:has(.bi-pic) > div:last-child { justify-self: end; margin-left: 0 }
+
+/* ползунок слоёв — у правого края просмотра, а не по центру длинной подписи */
+.layer-box { align-items: flex-end; right: 10px }
+.layer-box input[type=range] { margin-right: 2px }
+.layer-box .layer-all { align-self: flex-end }
