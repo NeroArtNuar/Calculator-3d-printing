@@ -6316,6 +6316,14 @@ onmessage=e=>{const{id,pos,keys,fdm,light,hull}=e.data;if(hull){try{postMessage(
     s && (s.textContent = H && H.st ? `${S(H.st.dimX,1)} × ${S(H.st.dimY,1)} × ${S(H.st.dimZ,1)} мм` : "")
   }
 
+  /* число столов/запусков для текста: без хвостов вида 0,9999999999999998 */
+  function loNumTxt(x) {
+    const v = +x;
+    if (!Number.isFinite(v)) return String(x ?? "");
+    const r = Math.round(v * 100) / 100;
+    return S(r, Math.abs(r - Math.round(r)) < .005 ? 0 : 2)
+  }
+
   function loTbL(b, s) {
     const x = b && b.querySelector(".tb-l");
     x ? x.textContent = s : b && (b.textContent = s)
@@ -6425,7 +6433,7 @@ onmessage=e=>{const{id,pos,keys,fdm,light,hull}=e.data;if(hull){try{postMessage(
     loThumb.c || (loThumb.c = new Map);
     if (loThumb.c.has(key)) return loThumb.c.get(key);
     let r = "";
-    try {
+    if (!loThumb.no) try {
       const W = 128;
       if (!loThumb.r) {
         const R = new THREE.WebGLRenderer({ antialias: !0, alpha: !0, preserveDrawingBuffer: !0 });
@@ -6454,9 +6462,51 @@ onmessage=e=>{const{id,pos,keys,fdm,light,hull}=e.data;if(hull){try{postMessage(
       const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: 0xd98a3d, roughness: .6, metalness: .05, side: THREE.DoubleSide }));
       sc.add(m), R.render(sc, cam), r = R.domElement.toDataURL("image/png"), sc.remove(m), g.dispose(), m.material.dispose()
     } catch (e) {
+      console.warn("Смета 3D: эскиз через WebGL не получился, рисую упрощённо", e), loThumb.no = !0
+    }
+    if (!r || r.length < 400) try {
+      r = loThumb2D(own ? own.pos : loSplitPos(P, shells))
+    } catch (e) {
       console.error(e)
     }
     return loThumb.c.set(key, r), r
+  }
+
+  /* запасной эскиз без WebGL: проекция с заливкой и светом, дальние грани рисуются первыми */
+  function loThumb2D(pos) {
+    const W = 128, n = pos.length / 9, st = Math.max(1, Math.ceil(n / 2e4)),
+      dx = .8, dy = -1, dz = .75, L = Math.hypot(dx, dy, dz), D = [dx / L, dy / L, dz / L],
+      U0 = [-D[0] * D[2], -D[1] * D[2], 1 - D[2] * D[2]], ul = Math.hypot(...U0), U = U0.map(v => v / ul),
+      R = [U[1] * D[2] - U[2] * D[1], U[2] * D[0] - U[0] * D[2], U[0] * D[1] - U[1] * D[0]],
+      T = [];
+    let x0 = 1 / 0, x1 = -1 / 0, y0 = 1 / 0, y1 = -1 / 0;
+    for (let f = 0; f < n; f += st) {
+      const o = f * 9, q = [];
+      let z = 0;
+      for (let v = 0; v < 3; v++) {
+        const x = pos[o + v * 3], y = pos[o + v * 3 + 1], w = pos[o + v * 3 + 2], u = x * R[0] + y * R[1] + w * R[2], h = x * U[0] + y * U[1] + w * U[2];
+        q.push(u, h), z += x * D[0] + y * D[1] + w * D[2], u < x0 && (x0 = u), u > x1 && (x1 = u), h < y0 && (y0 = h), h > y1 && (y1 = h)
+      }
+      const ax = pos[o + 3] - pos[o], ay = pos[o + 4] - pos[o + 1], az = pos[o + 5] - pos[o + 2], bx = pos[o + 6] - pos[o], by = pos[o + 7] - pos[o + 1], bz = pos[o + 8] - pos[o + 2];
+      let nx = ay * bz - az * by, ny = az * bx - ax * bz, nz = ax * by - ay * bx;
+      const nl = Math.hypot(nx, ny, nz) || 1;
+      T.push([z, q, Math.abs((nx * (.4) + ny * (-.6) + nz * .7) / nl)])
+    }
+    T.sort((a, b) => a[0] - b[0]);
+    const s = (W - 10) / Math.max(x1 - x0, y1 - y0, 1e-6), ox = (W - (x1 - x0) * s) / 2, oy = (W - (y1 - y0) * s) / 2,
+      c = document.createElement("canvas");
+    c.width = c.height = W;
+    const g = c.getContext("2d");
+    for (const [, q, li] of T) {
+      const k = .45 + .55 * li;
+      g.fillStyle = g.strokeStyle = `rgb(${Math.round(217*k)},${Math.round(138*k)},${Math.round(61*k)})`, g.lineWidth = .5, g.beginPath();
+      for (let v = 0; v < 3; v++) {
+        const X = ox + (q[v * 2] - x0) * s, Y = W - oy - (q[v * 2 + 1] - y0) * s;
+        v ? g.lineTo(X, Y) : g.moveTo(X, Y)
+      }
+      g.closePath(), g.fill(), g.stroke()
+    }
+    return c.toDataURL("image/png")
   }
 
   function loRowThumb(id) {
@@ -6960,7 +7010,7 @@ onmessage=e=>{const{id,pos,keys,fdm,light,hull}=e.data;if(hull){try{postMessage(
         mat: o && tt.has(o.c.tech) ? `${S(o.c.detail.mlTot,1)} мл × ${S(o.c.mt.price/1e3,2)} ₽/мл + спирт` : o ? `${S(o.c.gramsTot,1)} г × ${S(c/1e3,2)} ₽/г` : `${i(t.grams)} с потерями`,
         mach: `${S(t.machineH,2)} ч × ${S(d,1)} ₽/ч`,
         energy: `${S(s.kwhUsed,2)} кВт·ч × ${S(s.kwhEff,2)} ₽${n.twoRate&&s.night>.005?` · ночью ${S(s.night*100,0)}%`:""}`,
-        labor: [a.labor ? `приём ${n.setupMin} мин` : "", a.labor ? `${t.plates}×${S(o&&Number.isFinite(o.it.plateMin)?o.it.plateMin:n.plateMin)} мин` : "", a.post ? "постобработка" : ""].filter(Boolean).join(", ") + ` · ${S(n.rate)} ₽/ч`,
+        labor: [a.labor ? `приём ${n.setupMin} мин` : "", a.labor ? `${loNumTxt(t.plates)}×${S(o&&Number.isFinite(o.it.plateMin)?o.it.plateMin:n.plateMin)} мин` : "", a.post ? "постобработка" : ""].filter(Boolean).join(", ") + ` · ${S(n.rate)} ₽/ч`,
         extra: +n.cadH > 0 ? `${S(+n.cadH,1)} ч × ${S(n.cadRate)} ₽/ч, без наценки` : "не добавлено",
         risk: `${n.risk}% перепечаток`
       },
@@ -6971,10 +7021,10 @@ onmessage=e=>{const{id,pos,keys,fdm,light,hull}=e.data;if(hull){try{postMessage(
         mat: m.map(({
           it: y,
           c: b
-        }) => tt.has(b.tech) ? p(`${J(y.name)}: ${S(y.ml*b.qty,1)} мл + потери ${n.waste}% = ${S(b.detail.mlTot,1)} мл`, `${S(b.detail.mlTot/1e3*b.mt.price,2)} ₽`) + (y.plateCost ? p(`Спирт, перчатки: ${b.plates} × ${S(y.plateCost)} ₽`, Q(b.plates * y.plateCost, 2)) : "") : b.tech === "sls" && b.detail ? p(`${J(y.name)}: в деталях ${i(b.gramsNet)}`, "") + p(`Насыпано в камеру: ${b.detail.jobs} × ${i(b.detail.loaded)}, освежение ${S(b.mt.refresh)}%`, i(b.gramsTot)) + p("Свежий порошок", `${S(b.gramsTot/1e3*(y.priceKg>0?y.priceKg:b.mt.price),2)} ₽`) : p(`${J(y.name)}: ${i(b.gramsNet)} + потери ${n.waste}% = ${i(b.gramsTot)}`, `${S(b.gramsTot/1e3*(y.priceKg>0?y.priceKg:b.mt.price),2)} ₽`)).join("") + (m.length < x.length ? p(`…ещё ${x.length-m.length} позиций`, Q(x.slice(m.length).reduce((y, b) => y + b.c.mat, 0), 2)) : "") + p(o && tt.has(o.c.tech) ? "Цена смолы" : o && o.c.tech === "sls" ? "Цена порошка" : "Цена пластика", o ? `${S(c)} ₽/${tt.has(o.c.tech)?"л":"кг"} (${J(o.c.mt.name)})` : t.lines.length === 1 ? `${J(t.lines[0].c.mt.name)}` : "по материалам позиций"),
-        mach: (o && o.c.tech === "sls" && o.c.detail ? p(`Печать: нанесение ${S(o.c.detail.layers,0)} ${loPl(o.c.detail.layers,"слоя","слоёв","слоёв")} и спекание${o.c.detail.jobs>1?` · ${o.c.detail.jobs} запуска`:""}`, `${S(o.c.detail.jobs*(o.c.detail.tLayers+o.c.detail.tScan),2)} ч`) + p(`Нагрев камеры: ${o.c.detail.jobs} × ${S(r.warmup)} мин`, `${S(o.c.detail.jobs*o.c.detail.tHeat,2)} ч`) + p(`Охлаждение в станке: ${S(r.coolPct!=null&&r.coolPct!==""?+r.coolPct:100)}% от печати${+r.cool>0?`, не меньше ${S(r.cool)} мин`:""}`, `${S(o.c.detail.jobs*(o.c.detail.tCool||0),2)} ч`) : "") + (o && o.c.tech === "sls" && o.c.detail ? "" : p(tt.has(r.tech) ? r.tech === "sla" ? "Печать: лазер и разравнивание слоёв" : "Печать: засветка и подъём слоёв" : r.tech === "sls" ? "Печать: нанесение и спекание слоёв" : t.lines.length > 1 ? "Печать" : loGc && kn() ? "Печать (из G-code)" : kn() ? "Печать (из слайсера)" : "Печать (оценка по модели)", `${S(s.printH,2)} ч`) + p(`${tt.has(r.tech)?"Подготовка ванны":"Прогрев стола"}: ${t.plates} × ${S(r.warmup)} мин`, `${S(s.warmH,2)} ч`)) + (s.chamberH > 0 ? p(`Прогрев камеры дольше стола: ${t.plates} × ${S(Math.max(0,r.chamberMin-r.warmup))} мин`, `${S(s.chamberH,2)} ч`) : "") + (s.share != null && (o || t.lines[0]) ? p(`Доля общего стола (загрузка ${S((o || t.lines[0]).it.share)}%)`, `${S(s.share*100,1)}%`) : "") + p(`Амортизация: ${S(r.price)} ₽ ÷ ${S(r.life)} ч`, `${S(r.price/Math.max(1,r.life),2)} ₽/ч`) + p("Расходники и ремонт", `${S(r.maint,2)} ₽/ч`) + p(`Итого ${S(t.machineH,2)} ч × ${S(d,2)} ₽/ч`, Q(t.b.mach, 2)),
+        }) => tt.has(b.tech) ? p(`${J(y.name)}: ${S(y.ml*b.qty,1)} мл + потери ${n.waste}% = ${S(b.detail.mlTot,1)} мл`, `${S(b.detail.mlTot/1e3*b.mt.price,2)} ₽`) + (y.plateCost ? p(`Спирт, перчатки: ${loNumTxt(b.plates)} × ${S(y.plateCost)} ₽`, Q(b.plates * y.plateCost, 2)) : "") : b.tech === "sls" && b.detail ? p(`${J(y.name)}: в деталях ${i(b.gramsNet)}`, "") + p(`Насыпано в камеру: ${b.detail.jobs} × ${i(b.detail.loaded)}, освежение ${S(b.mt.refresh)}%`, i(b.gramsTot)) + p("Свежий порошок", `${S(b.gramsTot/1e3*(y.priceKg>0?y.priceKg:b.mt.price),2)} ₽`) : p(`${J(y.name)}: ${i(b.gramsNet)} + потери ${n.waste}% = ${i(b.gramsTot)}`, `${S(b.gramsTot/1e3*(y.priceKg>0?y.priceKg:b.mt.price),2)} ₽`)).join("") + (m.length < x.length ? p(`…ещё ${x.length-m.length} позиций`, Q(x.slice(m.length).reduce((y, b) => y + b.c.mat, 0), 2)) : "") + p(o && tt.has(o.c.tech) ? "Цена смолы" : o && o.c.tech === "sls" ? "Цена порошка" : "Цена пластика", o ? `${S(c)} ₽/${tt.has(o.c.tech)?"л":"кг"} (${J(o.c.mt.name)})` : t.lines.length === 1 ? `${J(t.lines[0].c.mt.name)}` : "по материалам позиций"),
+        mach: (o && o.c.tech === "sls" && o.c.detail ? p(`Печать: нанесение ${S(o.c.detail.layers,0)} ${loPl(o.c.detail.layers,"слоя","слоёв","слоёв")} и спекание${o.c.detail.jobs>1?` · ${o.c.detail.jobs} запуска`:""}`, `${S(o.c.detail.jobs*(o.c.detail.tLayers+o.c.detail.tScan),2)} ч`) + p(`Нагрев камеры: ${o.c.detail.jobs} × ${S(r.warmup)} мин`, `${S(o.c.detail.jobs*o.c.detail.tHeat,2)} ч`) + p(`Охлаждение в станке: ${S(r.coolPct!=null&&r.coolPct!==""?+r.coolPct:100)}% от печати${+r.cool>0?`, не меньше ${S(r.cool)} мин`:""}`, `${S(o.c.detail.jobs*(o.c.detail.tCool||0),2)} ч`) : "") + (o && o.c.tech === "sls" && o.c.detail ? "" : p(tt.has(r.tech) ? r.tech === "sla" ? "Печать: лазер и разравнивание слоёв" : "Печать: засветка и подъём слоёв" : r.tech === "sls" ? "Печать: нанесение и спекание слоёв" : t.lines.length > 1 ? "Печать" : loGc && kn() ? "Печать (из G-code)" : kn() ? "Печать (из слайсера)" : "Печать (оценка по модели)", `${S(s.printH,2)} ч`) + p(`${tt.has(r.tech)?"Подготовка ванны":"Прогрев стола"}: ${loNumTxt(t.plates)} × ${S(r.warmup)} мин`, `${S(s.warmH,2)} ч`)) + (s.chamberH > 0 ? p(`Прогрев камеры дольше стола: ${loNumTxt(t.plates)} × ${S(Math.max(0,r.chamberMin-r.warmup))} мин`, `${S(s.chamberH,2)} ч`) : "") + (s.share != null && (o || t.lines[0]) ? p(`Доля общего стола (загрузка ${S((o || t.lines[0]).it.share)}%)`, `${S(s.share*100,1)}%`) : "") + p(`Амортизация: ${S(r.price)} ₽ ÷ ${S(r.life)} ч`, `${S(r.price/Math.max(1,r.life),2)} ₽/ч`) + p("Расходники и ремонт", `${S(r.maint,2)} ₽/ч`) + p(`Итого ${S(t.machineH,2)} ч × ${S(d,2)} ₽/ч`, Q(t.b.mach, 2)),
         energy: p(`Мощность: принтер ${S(r.power)} Вт${(o?o.c.watts:t.lines.reduce((x,y)=>Math.max(x,y.c.watts||0),0))>(+r.power||0)?` + камера ${S(r.chamberPower)} Вт`:""}`, `${S(s.kwhUsed,2)} кВт·ч`) + (n.twoRate ? p(`День ${S((1-s.night)*100,0)}% × ${S(n.kwh,2)} ₽ · ночь ${S(s.night*100,0)}% × ${S(n.kwhNight,2)} ₽`, `${S(s.kwhEff,2)} ₽/кВт·ч`) : p("Тариф", `${S(n.kwh,2)} ₽/кВт·ч`)) + (n.twoRate ? p("Старт печати", ra(n.start) != null || (ra(n.busyUntil) || 0) > Date.now() ? Rt(t.plan.start) : "не задан — средний тариф за сутки") : ""),
-        labor: (a.labor ? p(`Приём заказа: ${n.setupMin} мин`, Q(s.setupH * n.rate, 2)) + p(`${o&&tt.has(o.c.tech)?"Мойка и засветка":o&&o.c.tech==="sls"?"Распаковка и очистка":"Снятие со стола"}: ${t.plates} × ${S(o&&Number.isFinite(o.it.plateMin)?o.it.plateMin:n.plateMin)} мин`, Q(s.plateLabH * n.rate, 2)) : "") + (a.post ? p(`Постобработка: ${S(t.qty)} шт, всего ${S(s.postH*60,0)} мин`, Q(s.postH * n.rate, 2)) : "") + p("Ставка оператора", `${S(n.rate)} ₽/ч`),
+        labor: (a.labor ? p(`Приём заказа: ${n.setupMin} мин`, Q(s.setupH * n.rate, 2)) + p(`${o&&tt.has(o.c.tech)?"Мойка и засветка":o&&o.c.tech==="sls"?"Распаковка и очистка":"Снятие со стола"}: ${loNumTxt(t.plates)} × ${S(o&&Number.isFinite(o.it.plateMin)?o.it.plateMin:n.plateMin)} мин`, Q(s.plateLabH * n.rate, 2)) : "") + (a.post ? p(`Постобработка: ${S(t.qty)} шт, всего ${S(s.postH*60,0)} мин`, Q(s.postH * n.rate, 2)) : "") + p("Ставка оператора", `${S(n.rate)} ₽/ч`),
         extra: p(`Моделирование: ${S(n.cadH,1)} ч × ${S(n.cadRate)} ₽`, Q(s.cad, 2)),
         risk: p(`База: ${o&&o.c.tech==="sls"?"порошок":o&&tt.has(o.c.tech)?"смола":"материал"} + станок + энергия + ${o&&o.c.tech==="sls"?"распаковка":o&&tt.has(o.c.tech)?"мойка":"снятие"}`, Q(s.riskBase, 2)) + p(`× ${n.risk}% ÷ (1 − ${n.risk}%)`, Q(t.b.risk, 2))
       },
@@ -7333,9 +7383,9 @@ onmessage=e=>{const{id,pos,keys,fdm,light,hull}=e.data;if(hull){try{postMessage(
         if (E.grp && !sg.has(E.grp)) {
           sg.add(E.grp);
           const gl = s.lines.filter(x => x.it.grp === E.grp);
-          rows.push([E.gname || "Изделие", "в комплекте: " + gl.map(x => x.it.name + ((+x.it.per || 1) !== 1 ? ` ×${S(+x.it.per,0)}` : "")).join(", "), +E.gq || 1, gl.reduce((a, x) => a + W(x.c) * M, 0), 0])
+          rows.push([E.gname || "Изделие", "в комплекте: " + gl.map(x => x.it.name + ((+x.it.per || 1) !== 1 ? ` ×${S(+x.it.per,0)}` : "")).join(", "), +E.gq || 1, gl.reduce((a, x) => a + W(x.c) * M, 0), 0, loGroupThumb(gl)])
         }
-        rows.push([E.name, `${Nt[k.tech].name} · ${k.mt.name}${E.color?" · "+E.color.toLowerCase():""}${E.incl&&E.incl.length?" · в составе: "+E.incl.join(", "):""}`, k.qty, W(k) * M, E.grp ? 1 : 0])
+        rows.push([E.name, `${Nt[k.tech].name} · ${k.mt.name}${E.color?" · "+E.color.toLowerCase():""}${E.incl&&E.incl.length?" · в составе: "+E.incl.join(", "):""}`, k.qty, W(k) * M, E.grp ? 1 : 0, loGeo.has(E.id) ? loRowThumb(E.id) : ""])
       });
       su > .5 && rows.push(["Подготовка заказа", "приём и подготовка файлов", 0, su]), sx > .5 && rows.push(["Моделирование и упаковка", "на весь заказ", 0, sx]), s.minApplied && rows.push(["До минимальной суммы заказа", "", 0, s.client - nm])
     } else {
@@ -7344,7 +7394,7 @@ onmessage=e=>{const{id,pos,keys,fdm,light,hull}=e.data;if(hull){try{postMessage(
       rows.push([a ? a.name : "Деталь", `${Nt[k.tech].name} · ${k.mt.name}${a&&a.color?" · "+a.color.toLowerCase():""}`, s.qty, s.client])
     }
     let nTop = 0, nSub = 0;
-    const tr = rows.map(([a, b, q, v, sub]) => sub ? `<tr class="sub"><td class="nn">${nTop}.${++nSub}</td><td>${J(a)}${b?`<small>${J(b)}</small>`:""}</td><td class="r">${q?S(q)+" шт":""}</td><td class="r">${q>1?mt(v/q):""}</td><td class="r">${mt(v)}</td></tr>` : (nTop++, nSub = 0, `<tr><td class="nn">${nTop}</td><td><b>${J(a)}</b>${b?`<small>${J(b)}</small>`:""}</td><td class="r">${q?S(q)+" шт":""}</td><td class="r">${q>1?mt(v/q):""}</td><td class="r b">${mt(v)}</td></tr>`)).join("");
+    const tr = rows.map(([a, b, q, v, sub, pic]) => sub ? `<tr class="sub"><td class="nn">${nTop}.${++nSub}</td><td>${pic?`<img class="kp-pic" src="${pic}" alt="">`:""}${J(a)}${b?`<small>${J(b)}</small>`:""}</td><td class="r">${q?S(q)+" шт":""}</td><td class="r">${q>1?mt(v/q):""}</td><td class="r">${mt(v)}</td></tr>` : (nTop++, nSub = 0, `<tr><td class="nn">${nTop}</td><td>${pic?`<img class="kp-pic" src="${pic}" alt="">`:""}<b>${J(a)}</b>${b?`<small>${J(b)}</small>`:""}</td><td class="r">${q?S(q)+" шт":""}</td><td class="r">${q>1?mt(v/q):""}</td><td class="r b">${mt(v)}</td></tr>`)).join("");
     let tiers = "";
     if (!n && Aa && B.batch) {
       const t = [1, 5, 10, 25, 50, 100].map(q => {
@@ -7379,7 +7429,7 @@ onmessage=e=>{const{id,pos,keys,fdm,light,hull}=e.data;if(hull){try{postMessage(
 h1{font-size:21px;margin:18px 0 4px;color:${bc}}h3{font-size:12px;margin:18px 0 8px;text-transform:uppercase;letter-spacing:.04em;color:#5b6670}
 .top{display:flex;gap:18px;margin-top:12px;align-items:flex-start}.pic{flex:0 0 230px;height:170px;border:1px solid #e1e5e9;border-radius:10px;background:#eef1f4;display:flex;align-items:center;justify-content:center;overflow:hidden}.pic img{max-width:100%;max-height:100%}
 .spec{flex:1;display:grid;grid-template-columns:1fr 1fr;gap:10px 18px;align-content:start}.spec div,.terms div{display:flex;flex-direction:column}.spec span,.terms span{font-size:10.5px;color:#5b6670;text-transform:uppercase;letter-spacing:.03em}.spec b,.terms b{font-weight:600}
-table{width:100%;border-collapse:collapse;margin-top:6px}th{font-size:10.5px;text-transform:uppercase;letter-spacing:.03em;color:#5b6670;text-align:left;padding:6px 8px;border-bottom:1.5px solid #1c2329}td{padding:8px;border-bottom:1px solid #e1e5e9;vertical-align:top}tr.sub td{padding-top:4px;padding-bottom:4px;color:#5b6670;font-size:11.5px}tr.sub td:nth-child(2){padding-left:22px}td small{display:block;color:#5b6670}td.nn{color:#8a949c;width:22px}.r{text-align:right;white-space:nowrap}th.r{text-align:right}.b{font-weight:700}
+table{width:100%;border-collapse:collapse;margin-top:6px}th{font-size:10.5px;text-transform:uppercase;letter-spacing:.03em;color:#5b6670;text-align:left;padding:6px 8px;border-bottom:1.5px solid #1c2329}td{padding:8px;border-bottom:1px solid #e1e5e9;vertical-align:top}tr.sub td{padding-top:4px;padding-bottom:4px;color:#5b6670;font-size:11.5px}tr.sub td:nth-child(2){padding-left:22px}.kp-pic{float:left;width:34px;height:34px;margin:0 9px 0 0;border-radius:6px;background:#eef1f4;object-fit:contain}tr.sub .kp-pic{width:26px;height:26px}td small{display:block;color:#5b6670}td.nn{color:#8a949c;width:22px}.r{text-align:right;white-space:nowrap}th.r{text-align:right}.b{font-weight:700}
 .tot{display:flex;justify-content:flex-end;margin-top:10px}.tot>div{min-width:250px;padding:12px 16px;border-radius:10px;background:${bc};color:#fff;text-align:right}.tot .v{font-size:22px;font-weight:800}.tot .k{font-size:11px;opacity:.85;text-transform:uppercase;letter-spacing:.04em}.tot-s{font-size:11px;opacity:.9}
 .tiers{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}.ti{border:1px solid #e1e5e9;border-radius:8px;padding:6px 8px;text-align:center}.ti span,.ti small{display:block;font-size:10.5px;color:#5b6670}.ti b{font-size:13px}.ti.on{border-color:${bc};box-shadow:inset 0 0 0 1px ${bc}}
 .terms{display:grid;grid-template-columns:repeat(3,1fr);gap:10px 18px;padding:12px 14px;border:1px solid #e1e5e9;border-radius:10px}
