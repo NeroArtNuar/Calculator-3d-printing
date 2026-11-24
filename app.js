@@ -3501,6 +3501,7 @@ window.__SMETA_SITE__ = 1;
   }
 
   function ge() {
+    loFace && loFaceStop();
     if (!Re || (ct && (Lt.remove(ct), ct.geometry.dispose(), ct = null), !H)) return;
     const t = new THREE.BufferGeometry;
     t.setAttribute("position", new THREE.BufferAttribute(H.pos, 3)), t.computeVertexNormals();
@@ -6203,6 +6204,120 @@ onmessage=e=>{const{id,pos,keys,fdm,light,hull}=e.data;if(hull){try{postMessage(
     const e = new THREE.Quaternion().setFromUnitVectors(t.clone().normalize(), new THREE.Vector3(0, 0, -1));
     return new THREE.Matrix4().makeRotationFromQuaternion(e).elements
   }
+
+  /* ===== «Гранью на стол» как в OrcaSlicer: навести на грань — подсветится, нажать — модель ляжет этой гранью ===== */
+  let loFace = null;
+
+  function loFaceN(P, i) {
+    const c = i * 9,
+      ax = P[c + 3] - P[c], ay = P[c + 4] - P[c + 1], az = P[c + 5] - P[c + 2],
+      bx = P[c + 6] - P[c], by = P[c + 7] - P[c + 1], bz = P[c + 8] - P[c + 2];
+    let x = ay * bz - az * by, y = az * bx - ax * bz, z = ax * by - ay * bx;
+    const k = Math.hypot(x, y, z);
+    return k < 1e-12 ? null : [x / k, y / k, z / k, k / 2]
+  }
+
+  let loFN = null;
+
+  function loFaceTab() {
+    if (loFN && loFN.P === H.pos && loFN.ver === H.ver) return loFN.N;
+    const P = H.pos, m = P.length / 9, N = new Float32Array(m * 5);
+    for (let f = 0; f < m; f++) {
+      const q = loFaceN(P, f), o = f * 5;
+      q ? (N[o] = q[0], N[o + 1] = q[1], N[o + 2] = q[2], N[o + 3] = q[3], N[o + 4] = 1) : N[o + 4] = 0
+    }
+    return loFN = { P, ver: H.ver, N }, N
+  }
+
+  function loFaceRegion(i) {
+    const P = H.pos, N = loFaceTab(), o0 = i * 5;
+    if (!N[o0 + 4]) return null;
+    const a = N[o0], b = N[o0 + 1], c = N[o0 + 2], d0 = a * P[i * 9] + b * P[i * 9 + 1] + c * P[i * 9 + 2],
+      cos = Math.cos(4 * Math.PI / 180), tol = Math.max(.15, (H.st ? Math.max(H.st.dimX, H.st.dimY, H.st.dimZ) : 100) * .002),
+      T = [];
+    let nx = 0, ny = 0, nz = 0, A = 0;
+    for (let f = 0, m = P.length / 9; f < m; f++) {
+      const o = f * 5;
+      if (!N[o + 4] || N[o] * a + N[o + 1] * b + N[o + 2] * c < cos) continue;
+      const k = f * 9;
+      if (Math.abs(a * P[k] + b * P[k + 1] + c * P[k + 2] - d0) > tol || Math.abs(a * P[k + 3] + b * P[k + 4] + c * P[k + 5] - d0) > tol || Math.abs(a * P[k + 6] + b * P[k + 7] + c * P[k + 8] - d0) > tol) continue;
+      T.push(f), nx += N[o] * N[o + 3], ny += N[o + 1] * N[o + 3], nz += N[o + 2] * N[o + 3], A += N[o + 3]
+    }
+    const k = Math.hypot(nx, ny, nz) || 1;
+    return { T, S: new Set(T), n: new THREE.Vector3(nx / k, ny / k, nz / k), area: A }
+  }
+
+  function loFaceHit(e) {
+    if (!ct || !H) return null;
+    const v = f("viewer"), r = v.getBoundingClientRect(),
+      q = new THREE.Vector2((e.clientX - r.left) / r.width * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1),
+      c = new THREE.Raycaster;
+    c.setFromCamera(q, Fe);
+    const h = c.intersectObject(ct, !1)[0];
+    return h && h.faceIndex != null ? h.faceIndex : null
+  }
+
+  function loFaceShow(reg) {
+    loFace.hl && (Lt.remove(loFace.hl), loFace.hl.geometry.dispose(), loFace.hl = null);
+    if (reg && reg.T.length) {
+      const P = H.pos, o = new Float32Array(reg.T.length * 9), lift = reg.n.clone().multiplyScalar(.05);
+      reg.T.forEach((f, i) => {
+        for (let k = 0; k < 9; k++) o[i * 9 + k] = P[f * 9 + k] + [lift.x, lift.y, lift.z][k % 3]
+      });
+      const g = new THREE.BufferGeometry;
+      g.setAttribute("position", new THREE.BufferAttribute(o, 3));
+      loFace.hl = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: 0x22c55e, transparent: !0, opacity: .75, side: THREE.DoubleSide, depthTest: !0, polygonOffset: !0, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
+      loFace.hl.position.copy(ct.position), loFace.hl.scale.copy(ct.scale), loFace.hl.renderOrder = 20, Lt.add(loFace.hl)
+    }
+    zt = !0
+  }
+
+  function loFaceStop(msg) {
+    if (!loFace) return;
+    const v = f("viewer");
+    v.removeEventListener("pointermove", loFace.mv), v.removeEventListener("pointerdown", loFace.dn, !0), v.removeEventListener("pointerup", loFace.up, !0), document.removeEventListener("keydown", loFace.key, !0);
+    loFaceShow(null), v.classList.remove("face-pick");
+    const b = f("btnFace");
+    b && b.classList.remove("on"), loFace = null, msg && V(msg)
+  }
+
+  function loFaceStart() {
+    if (loFace) return loFaceStop("Отменено");
+    if (!H || !ct) return V("Сначала загрузите модель");
+    const v = f("viewer");
+    let raf = 0, last = -1, d = null;
+    loFace = {
+      hl: null, reg: null,
+      mv: e => {
+        raf || (raf = requestAnimationFrame(() => {
+          raf = 0;
+          if (!loFace) return;
+          const i = loFaceHit(e);
+          if (i === last) return;
+          last = i;
+          if (i == null) return loFace.reg = null, loFaceShow(null);
+          const P = H.pos, done = loFace.reg && loFace.reg.S.has(i);
+          done || (loFace.reg = loFaceRegion(i), loFaceShow(loFace.reg))
+        }))
+      },
+      dn: e => { d = { x: e.clientX, y: e.clientY } },
+      up: async e => {
+        if (!d || Math.hypot(e.clientX - d.x, e.clientY - d.y) > 5) return;
+        const i = loFaceHit(e);
+        if (i == null) return;
+        e.stopPropagation();
+        const reg = loFace.reg && loFace.reg.S.has(i) ? loFace.reg : loFaceRegion(i);
+        if (!reg) return;
+        loFaceStop(), Le(H.pos, Rs(reg.n)), await Wt(), V(`Модель лежит выбранной гранью (${S(reg.area / 100, 1)} см²)`)
+      },
+      key: e => { e.key === "Escape" && (e.stopPropagation(), loFaceStop("Отменено")) }
+    };
+    v.addEventListener("pointermove", loFace.mv), v.addEventListener("pointerdown", loFace.dn, !0), v.addEventListener("pointerup", loFace.up, !0), document.addEventListener("keydown", loFace.key, !0);
+    v.classList.add("face-pick"), loFaceTab();
+    const b = f("btnFace");
+    b && b.classList.add("on"), V("Наведите на грань модели — она подсветится зелёным. Нажмите, и модель ляжет ею на стол. Esc — отмена")
+  }
+
   async function Os() {
     if (!H) return;
     const t = Hs(H.pos, 1);
@@ -7243,6 +7358,7 @@ ${(m.shopInfo||"").trim()?`<div class="ft">${J(m.shopInfo.trim())}</div>`:""}
         ["units", "Единицы файла", () => Ht("#unitSel")],
         ["dims", "Масштаб и размеры X / Y / Z", () => [...Ht("#scalePct"), ...Ht("#dimX"), ...Ht("#dimY"), ...Ht("#dimZ"), ...Ht("#scaleLock2")]],
         ["tFlat", "Кнопка «На грань»", () => Et("#btnFlat")],
+        ["tFace", "Кнопка «Гранью на стол»", () => Et("#btnFace")],
         ["tOrient", "Кнопка «Подобрать»", () => Et("#btnOrient")],
         ["tPos", "Кнопка «Положение»", () => Et("#btnPos")],
         ["tRepair", "Кнопка «Починить»", () => Et("#btnRepair")],
@@ -10394,7 +10510,10 @@ uniform float uLayerH;`).replace("#include <color_fragment>", `#include <color_f
         c = Math.PI / 2,
         d = (i.dataset.rot === "x" ? r.makeRotationX(c) : i.dataset.rot === "y" ? r.makeRotationY(c) : r.makeRotationZ(c)).elements;
       Le(H.pos, d), Wt(i.dataset.rot === "z")
-    })), f("btnFlat").onclick = Os, f("btnOrient").onclick = Sa, f("btnRepair").onclick = La, f("btnOver").onclick = () => {
+    })), f("btnFlat").onclick = Os, f("btnFace").onclick = loFaceStart, document.addEventListener("keydown", i => {
+      const g = i.target;
+      (i.key === "f" || i.key === "F" || i.key === "а" || i.key === "А") && !i.ctrlKey && !i.metaKey && !i.altKey && !(g && (g.isContentEditable || /^(INPUT|SELECT|TEXTAREA)$/.test(g.tagName))) && f("dlg").hidden && !f("btnFace").hidden && f("btnFace").offsetParent && (i.preventDefault(), loFaceStart())
+    }), f("btnOrient").onclick = Sa, f("btnRepair").onclick = La, f("btnOver").onclick = () => {
       En = !En, f("btnOver").classList.toggle("on", En), ge()
     }, f("btnCam").onclick = Sn;
     const n = ["supPanel", "posPanel"],

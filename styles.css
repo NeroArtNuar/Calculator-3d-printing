@@ -3736,3 +3736,7 @@ textarea {
 /* кнопка «Очистить стол» */
 .toolbar .clear-bed { color: var(--bad) }
 .toolbar .clear-bed.sure { background: var(--bad); color: #fff }
+
+/* режим «Гранью на стол» */
+#viewer.face-pick, #viewer.face-pick canvas { cursor: crosshair !important }
+.toolbar button.on { background: var(--accent); color: #fff }
