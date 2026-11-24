@@ -13,7 +13,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" integrity="sha512-dLxUelApnYxpLt6K2iomGngnHO83iUvZytA3YjDUCjT0HDOHKXnVYdf3hU4JjM8uEhxf9nD1/ey98U3t2vZ0qQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" integrity="sha512-XMVd28F1oH/O71fzwBnV7HucLxVwtxf26XV8P4wPk26EDxuGZ91N8bsOttmnomcCD3CS5ZMRL50H0GgOHvegtg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script>/* CDN недоступен или файл подменён — берём копии из репозитория */window.THREE||document.write('<script src="vendor/three-r128.min.js"><\/script>');window.JSZip||document.write('<script src="vendor/jszip-3.10.1.min.js"><\/script>');</script>
-<link rel="stylesheet" href="styles.css?v=35fad52b">
+<link rel="stylesheet" href="styles.css?v=a2aa183b">
 </head>
 <body>
 <div class="as-bar" id="asBar" hidden><span id="asBarT"></span> · <button class="as-bar-x" type="button" id="asBarX">Выйти из просмотра</button></div>
@@ -87,7 +87,7 @@
               <button type="button" class="adv" id="btnFlat" title="Положить на самую большую плоскую грань">На грань</button><button type="button" class="adv" id="btnFace" title="Нажмите, потом выберите на модели грань — модель ляжет ею на стол (клавиша F)">Гранью на стол</button>
               <button type="button" id="btnOrient" title="Выбрать самое выгодное положение для текущей технологии">Подобрать</button>
               <button type="button" class="adv" id="btnPos" title="Повороты на любой угол и подбор положения по цели">Положение</button>
-              <button type="button" id="btnRepair" title="Закрыть дыры, развернуть нормали, убрать лишние грани">Починить</button>
+              <button type="button" class="adv" id="btnSplit" title="Сборка из нескольких тел: разделить на изделия и детали для заказа">Разбить на части</button><button type="button" id="btnRepair" title="Закрыть дыры, развернуть нормали, убрать лишние грани">Починить</button>
               <button type="button" class="adv" id="btnSup" title="Поддержки, плот и острова" data-tech="fdm sla dlp lcd">Поддержки</button>
               <button type="button" id="btnScale" title="Изменить масштаб модели">Масштаб</button>
             </div>
@@ -432,7 +432,7 @@
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-<script src="app.js?v=785573f4"></script>
+<script src="app.js?v=1ffa1847"></script>
 
 </body>
 </html>

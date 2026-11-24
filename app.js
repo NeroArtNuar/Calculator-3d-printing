@@ -6318,6 +6318,213 @@ onmessage=e=>{const{id,pos,keys,fdm,light,hull}=e.data;if(hull){try{postMessage(
     b && b.classList.add("on"), V("Наведите на грань модели — она подсветится зелёным. Нажмите, и модель ляжет ею на стол. Esc — отмена")
   }
 
+
+  function loOrd(L) {
+    const o = [], done = new Set;
+    for (const x of L) {
+      if (done.has(x)) continue;
+      if (x.it.grp) {
+        for (const y of L) y.it.grp === x.it.grp && !done.has(y) && (done.add(y), o.push(y))
+      } else done.add(x), o.push(x)
+    }
+    return o
+  }
+
+  /* ===== «Разбить на части»: сборка из нескольких тел → изделия и их детали ===== */
+  function loShells(P) {
+    const n = P.length / 9, map = new Map, vid = new Int32Array(n * 3);
+    let nv = 0;
+    for (let i = 0; i < n * 3; i++) {
+      const k = Math.round(P[i * 3] * 500) + "," + Math.round(P[i * 3 + 1] * 500) + "," + Math.round(P[i * 3 + 2] * 500);
+      let v = map.get(k);
+      v === void 0 && map.set(k, v = nv++), vid[i] = v
+    }
+    const par = new Int32Array(nv);
+    for (let i = 0; i < nv; i++) par[i] = i;
+    const fd = x => {
+      for (; par[x] !== x;) par[x] = par[par[x]], x = par[x];
+      return x
+    }, un = (a, b) => {
+      a = fd(a), b = fd(b), a !== b && (par[a] = b)
+    };
+    for (let t = 0; t < n; t++) un(vid[t * 3], vid[t * 3 + 1]), un(vid[t * 3], vid[t * 3 + 2]);
+    const cm = new Map;
+    for (let t = 0; t < n; t++) {
+      const r = fd(vid[t * 3]);
+      let c = cm.get(r);
+      c || cm.set(r, c = { tris: [], mn: [1 / 0, 1 / 0, 1 / 0], mx: [-1 / 0, -1 / 0, -1 / 0], vol: 0 }), c.tris.push(t);
+      const o = t * 9;
+      for (let v = 0; v < 3; v++)
+        for (let a = 0; a < 3; a++) {
+          const q = P[o + v * 3 + a];
+          q < c.mn[a] && (c.mn[a] = q), q > c.mx[a] && (c.mx[a] = q)
+        }
+      c.vol += (P[o] * (P[o + 4] * P[o + 8] - P[o + 5] * P[o + 7]) - P[o + 1] * (P[o + 3] * P[o + 8] - P[o + 5] * P[o + 6]) + P[o + 2] * (P[o + 3] * P[o + 7] - P[o + 4] * P[o + 6])) / 6
+    }
+    return [...cm.values()].map(c => (c.vol = Math.abs(c.vol), c.dim = [0, 1, 2].map(a => c.mx[a] - c.mn[a]), c)).sort((a, b) => b.vol - a.vol)
+  }
+
+  /* маленький эскиз детали: проекция на её самую широкую плоскость */
+  function loThumb(P, shells) {
+    const key = shells.map(c => c.tris[0] + ":" + c.tris.length).join(",");
+    loThumb.c || (loThumb.c = new Map);
+    if (loThumb.c.has(key)) return loThumb.c.get(key);
+    const mn = [0, 1, 2].map(a => Math.min(...shells.map(c => c.mn[a]))), mx = [0, 1, 2].map(a => Math.max(...shells.map(c => c.mx[a]))),
+      d = [0, 1, 2].map(a => mx[a] - mn[a]), z = d.indexOf(Math.min(...d)), [u, v] = [0, 1, 2].filter(a => a !== z),
+      W = 56, s = (W - 6) / Math.max(d[u], d[v], 1e-6), ox = (W - d[u] * s) / 2, oy = (W - d[v] * s) / 2,
+      cv = document.createElement("canvas");
+    cv.width = cv.height = W;
+    const x = cv.getContext("2d");
+    x.fillStyle = "#f59e0b", x.strokeStyle = "#f59e0b", x.lineWidth = .6;
+    let all = 0;
+    for (const c of shells) all += c.tris.length;
+    const step = Math.max(1, Math.floor(all / 25e3));
+    x.beginPath();
+    for (const c of shells)
+      for (let i = 0; i < c.tris.length; i += step) {
+        const o = c.tris[i] * 9;
+        for (let k = 0; k < 3; k++) {
+          const px = ox + (P[o + k * 3 + u] - mn[u]) * s, py = W - oy - (P[o + k * 3 + v] - mn[v]) * s;
+          k ? x.lineTo(px, py) : x.moveTo(px, py)
+        }
+        x.closePath()
+      }
+    x.fill(), x.stroke();
+    const r = cv.toDataURL();
+    return loThumb.c.set(key, r), r
+  }
+
+  function loGap(a, b) {
+    let g = 0;
+    for (let k = 0; k < 3; k++) g = Math.max(g, a.mn[k] - b.mx[k], b.mn[k] - a.mx[k]);
+    return g
+  }
+
+  /* Раскладка по умолчанию: крупные тела — основа изделия, мелкие прилипают к ближайшей основе,
+     мелкие буквы одного изделия собираются в одну «Надпись» */
+  function loSplitPlan(sh) {
+    const big = sh[0].vol, isMain = c => c.vol >= Math.max(500, big * .08),
+      mains = sh.filter(isMain), smalls = sh.filter(c => !isMain(c)),
+      G = mains.map((m, i) => ({ name: "Изделие " + (i + 1), main: m, att: [] })), loose = [];
+    for (const c of smalls) {
+      let best = null, bg = 1 / 0;
+      for (const g of G) {
+        const d = loGap(c, g.main);
+        d < bg && (bg = d, best = g)
+      }
+      best && bg <= 1.5 ? best.att.push(c) : loose.push(c)
+    }
+    const E = [];
+    let gi = 0;
+    const groups = [];
+    for (const g of G) {
+      if (!g.att.length) {
+        E.push({ name: "", shells: [g.main], g: -1, main: !0, print: "sep" });
+        continue
+      }
+      const id = groups.length;
+      groups.push({ name: "Изделие " + (++gi) });
+      E.push({ name: "Корпус", shells: [g.main], g: id, main: !0, print: "sep" });
+      const letters = g.att.filter(c => Math.max(...c.dim) <= 15), rest = g.att.filter(c => Math.max(...c.dim) > 15);
+      rest.forEach((c, i) => E.push({ name: "Элемент " + (i + 1), shells: [c], g: id, print: "sep" })), letters.length && E.push({ name: "Надпись", shells: letters, g: id, print: "sep" })
+    }
+    const lt = loose.filter(c => Math.max(...c.dim) <= 15), lr = loose.filter(c => Math.max(...c.dim) > 15);
+    lr.forEach(c => E.push({ name: "", shells: [c], g: -1, print: "sep" })), lt.length && E.push({ name: "Надпись", shells: lt, g: -1, print: "sep" });
+    let k = 0;
+    for (const e of E) e.name || (e.name = "Деталь " + ++k);
+    return { groups, E }
+  }
+
+  function loSplitPos(P, shells) {
+    let n = 0;
+    for (const c of shells) n += c.tris.length;
+    const o = new Float32Array(n * 9);
+    let w = 0;
+    for (const c of shells)
+      for (const t of c.tris) o.set(P.subarray(t * 9, t * 9 + 9), w), w += 9;
+    return o
+  }
+
+  async function loSplit() {
+    if (!H || !H.pos) return V("Сначала загрузите модель");
+    if (!l.blocks.basket) return V("Разбивка добавляет детали в список заказа — он сейчас отключён");
+    it(!0, "Ищу отдельные части модели…"), await kt();
+    let sh;
+    try {
+      sh = loShells(H.pos)
+    } finally {
+      it(!1)
+    }
+    if (sh.length < 2) return V("Модель цельная — разбивать нечего");
+    const P = H.pos, src = loCur, base = (l.part.name || H.name || "Сборка").replace(/\.[^.]+$/, ""),
+      plan = loSplitPlan(sh), vol = e => e.shells.reduce((a, c) => a + c.vol, 0) / 1e3,
+      gOpt = sel => `<option value="-1"${sel===-1?" selected":""}>Отдельная деталь</option>` + plan.groups.map((g, i) => `<option value="${i}"${sel===i?" selected":""}>${J(g.name)}</option>`).join(""),
+      draw = () => {
+        const rows = [];
+        const block = (gi, title) => {
+          const es = plan.E.map((e, i) => [e, i]).filter(([e]) => e.g === gi);
+          if (!es.length) return;
+          rows.push(`<div class="sp-g">${gi>=0?`<input class="sp-gn" data-gn="${gi}" value="${J(plan.groups[gi].name)}" aria-label="Название изделия">`:`<b>${title}</b>`}</div>`);
+          for (const [e, i] of es) rows.push(`<div class="sp-e"><img class="sp-pic" alt="" src="${loThumb(P, e.shells)}"><input data-en="${i}" value="${J(e.name)}" aria-label="Название детали"><small>${S(vol(e),1)} см³${e.shells.length>1?` · ${e.shells.length} ${loPl(e.shells.length,"тело","тела","тел")}`:""}</small><select data-eg="${i}" aria-label="Изделие">${gOpt(e.g)}</select>${e.g>=0&&!e.main?`<select data-ep="${i}" aria-label="Как печатать"><option value="sep"${e.print==="sep"?" selected":""}>печатать отдельно</option><option value="in"${e.print==="in"?" selected":""}>вместе с корпусом</option></select>`:`<span class="sp-ph">${e.g>=0?"основа":""}</span>`}</div>`)
+        };
+        plan.groups.forEach((g, i) => block(i)), block(-1, "Отдельные детали");
+        f("dlgBody").innerHTML = `<p class="sub">В файле ${S(sh.length)} ${loPl(sh.length,"отдельное тело","отдельных тела","отдельных тел")}. Мелкие части привязаны к ближайшей крупной — это изделие. Буквы одного изделия собраны в «Надпись». Проверьте и поправьте: название, к какому изделию относится, как печатать.</p><div class="sp-list">${rows.join("")}</div><p class="sub">«Вместе с корпусом» — деталь печатается в одном задании с корпусом (например, другим цветом): её пластик и время войдут в цену корпуса. «Отдельно» — своя строка в заказе, её можно положить на стол отдельно и выбрать ей материал.</p>`
+      };
+    xe("Разбить на части", "", `<button class="btn ghost" type="button" id="spCancel">Отмена</button><button class="btn" type="button" id="spOk">Добавить в заказ</button>`), f("dlg").classList.add("wide"), draw();
+    const body = f("dlgBody");
+    body.oninput = e => {
+      const t = e.target;
+      t.dataset.gn != null && (plan.groups[+t.dataset.gn].name = t.value), t.dataset.en != null && (plan.E[+t.dataset.en].name = t.value)
+    }, body.onchange = e => {
+      const t = e.target;
+      if (t.dataset.eg != null) {
+        const x = plan.E[+t.dataset.eg];
+        x.g = +t.value, x.main = x.g >= 0 && !plan.E.some(y => y !== x && y.g === x.g && y.main), x.g < 0 && (x.main = !1, x.print = "sep"), draw()
+      }
+      t.dataset.ep != null && (plan.E[+t.dataset.ep].print = t.value)
+    };
+    const close = () => (f("dlg").classList.remove("wide"), body.oninput = body.onchange = null, Mt());
+    f("spCancel").onclick = close, f("spOk").onclick = async () => {
+      close();
+      const todo = [];
+      plan.groups.forEach((g, gi) => {
+        const es = plan.E.filter(e => e.g === gi);
+        if (!es.length) return;
+        let m = es.find(e => e.main) || es[0];
+        const inn = es.filter(e => e !== m && e.print === "in"), sep = es.filter(e => e !== m && e.print !== "in"),
+          gid = "g" + loPid(), gname = (g.name || "Изделие").trim(), solo = !sep.length;
+        todo.push({ name: solo ? gname : (m.name || "Корпус").trim(), shells: [...m.shells, ...inn.flatMap(e => e.shells)], incl: inn.map(e => e.name.trim()), grp: solo ? null : gid, gname, main: !0 });
+        for (const e of sep) todo.push({ name: e.name.trim(), shells: e.shells, grp: gid, gname })
+      });
+      const alone = plan.E.filter(e => e.g < 0), seen = new Map;
+      for (const e of alone) {
+        const d = e.shells.length === 1 ? e.shells[0] : null,
+          key = d ? [Math.round(d.vol / 100), ...d.dim.map(x => Math.round(x * 2)).sort((a, b) => a - b)].join("|") : null,
+          tw = key && seen.get(key);
+        if (tw) {
+          tw.qty++;
+          continue
+        }
+        const x = { name: e.name.trim(), shells: e.shells, qty: 1 };
+        key && seen.set(key, x), todo.push(x)
+      }
+      let dn = 0;
+      for (const x of todo) /^Деталь \d+$/.test(x.name) && (x.name = "Деталь " + ++dn);
+      try {
+        for (const [i, x] of todo.entries()) {
+          it(!0, `Считаю детали: ${i + 1} из ${todo.length} — ${x.gname ? x.gname + " · " : ""}${x.name}`), await kt(), await loAddGeom(loSplitPos(P, x.shells), x.name);
+          const b = l.basket.find(q => q.id === loCur);
+          if (!b) continue;
+          x.grp && (b.grp = x.grp, b.gname = x.gname, b.gq = 1, b.per = 1), x.incl && x.incl.length && (b.incl = x.incl), x.qty > 1 && (l.part.qty = x.qty, ft()), x.main || (await Os()), loSyncCur(), at()
+        }
+        src && l.basket.some(b => b.id === src) && loDel(src)
+      } finally {
+        it(!1)
+      }
+      at(), loSaveM(), V(`Готово: ${S(todo.length)} ${loPl(todo.length,"позиция","позиции","позиций")} в заказе. Мелкие детали положены на стол плоской стороной`)
+    }
+  }
+
   async function Os() {
     if (!H) return;
     const t = Hs(H.pos, 1);
@@ -6755,13 +6962,21 @@ onmessage=e=>{const{id,pos,keys,fdm,light,hull}=e.data;if(hull){try{postMessage(
         su = (s.det && s.det.setupH || 0) * (+t.rate || 0) * (1 + s.prepMk / 100) * (1 + (s.det && s.det.adjust || 0) / 100) * (1 + s.rush) * (1 - s.optEff) * s.kCl,
         sx = ((s.det && s.det.cad || 0) + (s.det && s.det.pack || 0) * (1 + (+t.markup || 0) / 100)) * (1 + (s.det && s.det.adjust || 0) / 100) * (1 + s.rush) * (1 - s.optEff) * s.kCl,
         M = sw > 0 ? (nm - su - sx) / sw : 0;
-      f("basket").innerHTML = s.lines.map(({
+      const seenG = new Set;
+      f("basket").innerHTML = loOrd(s.lines).map(({
         it: E,
         c: k
       }) => {
+        let hd = "";
+        if (E.grp && !seenG.has(E.grp)) {
+          seenG.add(E.grp);
+          const gl = s.lines.filter(x => x.it.grp === E.grp), gq = +E.gq || 1,
+            sum = gl.reduce((a, x) => a + W(x.c) * M, 0), gr = gl.reduce((a, x) => a + (tt.has(x.c.tech) ? 0 : (+x.it.grams || 0) * (+x.it.per || 1)), 0);
+          hd = `<div class="bi bg-h"><div class="n"><b>${J(E.gname||"Изделие")}</b><small>изделие · ${gl.length} ${loPl(gl.length,"деталь","детали","деталей")}${gr>0?` · ${S(gr,0)} г на 1 шт`:""}</small></div><div style="display:flex;align-items:center;gap:6px"><span class="inp" style="width:84px"><input type="number" min="1" max="100000" step="1" inputmode="numeric" value="${gq}" data-gq="${J(E.grp)}" aria-label="Количество изделий, шт"><em>шт</em></span><span class="p">${mt(sum/gq)}/шт</span><button class="btn small ghost" type="button" data-gren="${J(E.grp)}" aria-label="Переименовать изделие" title="Переименовать изделие">✎</button><button class="btn small ghost danger" type="button" data-gdel="${J(E.grp)}" aria-label="Удалить изделие" title="Удалить изделие со всеми деталями">✕</button></div></div>`
+        }
         const g = W(k) * M / k.qty,
           y = tt.has(k.tech) ? `${S(E.ml,1)} мл` : `${S(E.grams,1)} г`;
-        return `<div class="bi${E.id===loCur?" cur":""}" data-t="${k.tech}"${loGeo.has(E.id)&&E.id!==loCur?` data-row="${J(E.id)}" title="Открыть эту деталь на столе"`:""}><div class="n"><b ${loGeo.has(E.id)&&E.id!==loCur?`data-sel="${J(E.id)}" role="button" tabindex="0" style="cursor:pointer;text-decoration:underline dotted" title="Открыть деталь: положение, масштаб, параметры"`:""}>${E.id===loCur?"▸ ":""}${J(E.name)}</b><small><select data-bm="${J(E.id)}" aria-label="Материал позиции" style="font:inherit;max-width:180px">${gn(k.tech).filter(m=>!m.off||m.id===k.mt.id).map(m=>`<option value="${J(m.id)}" ${m.id===k.mt.id?"selected":""}>${J(m.name)}</option>`).join("")}</select> · ${y}${E.gcode?" · G-code":""}${E.chamber?" · камера":""}</small></div><div style="display:flex;align-items:center;gap:6px"><span class="inp" style="width:84px"><input type="number" min="1" max="100000" step="1" inputmode="numeric" value="${k.qty}" data-bq="${J(E.id)}" aria-label="Количество, шт"><em>шт</em></span><span class="p">${mt(g)}/шт</span><button class="btn small ghost" type="button" data-dup="${J(E.id)}" aria-label="Дублировать" title="Дублировать">⧉</button><button class="btn small ghost danger" type="button" data-del="${J(E.id)}" aria-label="Удалить">✕</button></div></div>`
+        return hd + `<div class="bi${E.grp?" bi-sub":""}${E.id===loCur?" cur":""}" data-t="${k.tech}"${loGeo.has(E.id)&&E.id!==loCur?` data-row="${J(E.id)}" title="Открыть эту деталь на столе"`:""}><div class="n"><b ${loGeo.has(E.id)&&E.id!==loCur?`data-sel="${J(E.id)}" role="button" tabindex="0" style="cursor:pointer;text-decoration:underline dotted" title="Открыть деталь: положение, масштаб, параметры"`:""}>${E.id===loCur?"▸ ":""}${J(E.name)}</b><small><select data-bm="${J(E.id)}" aria-label="Материал позиции" style="font:inherit;max-width:180px">${gn(k.tech).filter(m=>!m.off||m.id===k.mt.id).map(m=>`<option value="${J(m.id)}" ${m.id===k.mt.id?"selected":""}>${J(m.name)}</option>`).join("")}</select> · ${y}${E.gcode?" · G-code":""}${E.chamber?" · камера":""}${E.incl&&E.incl.length?` · в составе: ${J(E.incl.join(", "))}`:""}</small></div><div style="display:flex;align-items:center;gap:6px"><span class="inp" style="width:84px"${E.grp?` title="Всего на заказ: по ${S(+E.per||1)} на изделие"`:""}><input type="number" min="1" max="100000" step="1" inputmode="numeric" value="${k.qty}" data-bq="${J(E.id)}" aria-label="Количество, шт"><em>шт</em></span><span class="p">${mt(g)}/шт</span><button class="btn small ghost" type="button" data-dup="${J(E.id)}" aria-label="Дублировать" title="Дублировать">⧉</button><button class="btn small ghost danger" type="button" data-del="${J(E.id)}" aria-label="Удалить">✕</button></div></div>`
       }).join("") + (su > .5 ? `<div class="bi"><div class="n"><b>Подготовка заказа</b><small>приём и подготовка, разово на весь заказ</small></div><span class="p">${Q(su)}</span></div>` : "") + (sx > .5 ? `<div class="bi"><div class="n"><b>Моделирование и упаковка</b><small>на весь заказ</small></div><span class="p">${Q(sx)}</span></div>` : "") + (s.minApplied ? `<div class="bi"><div class="n"><b>До минимальной суммы заказа</b><small>детали стоят ${Q(nm)}, минимум ${Q(s.client)}</small></div><span class="p">${Q(s.client-nm)}</span></div>` : "")
     }
     Ys()
@@ -6987,17 +7202,26 @@ onmessage=e=>{const{id,pos,keys,fdm,light,hull}=e.data;if(hull){try{postMessage(
         su = (dt.setupH || 0) * (+m.rate || 0) * (1 + s.prepMk / 100) * k1,
         sx = ((dt.cad || 0) + (dt.pack || 0) * (1 + (+m.markup || 0) / 100)) * k1,
         M = sw > 0 ? (nm - su - sx) / sw : 0;
-      s.lines.forEach(({
+      const sg = new Set;
+      loOrd(s.lines).forEach(({
         it: E,
         c: k
-      }) => rows.push([E.name, `${Nt[k.tech].name} · ${k.mt.name}${E.color?" · "+E.color.toLowerCase():""}`, k.qty, W(k) * M]));
+      }) => {
+        if (E.grp && !sg.has(E.grp)) {
+          sg.add(E.grp);
+          const gl = s.lines.filter(x => x.it.grp === E.grp);
+          rows.push([E.gname || "Изделие", "в комплекте: " + gl.map(x => x.it.name + ((+x.it.per || 1) !== 1 ? ` ×${S(+x.it.per,0)}` : "")).join(", "), +E.gq || 1, gl.reduce((a, x) => a + W(x.c) * M, 0), 0])
+        }
+        rows.push([E.name, `${Nt[k.tech].name} · ${k.mt.name}${E.color?" · "+E.color.toLowerCase():""}${E.incl&&E.incl.length?" · в составе: "+E.incl.join(", "):""}`, k.qty, W(k) * M, E.grp ? 1 : 0])
+      });
       su > .5 && rows.push(["Подготовка заказа", "приём и подготовка файлов", 0, su]), sx > .5 && rows.push(["Моделирование и упаковка", "на весь заказ", 0, sx]), s.minApplied && rows.push(["До минимальной суммы заказа", "", 0, s.client - nm])
     } else {
       const a = Aa,
         k = s.lines[0].c;
       rows.push([a ? a.name : "Деталь", `${Nt[k.tech].name} · ${k.mt.name}${a&&a.color?" · "+a.color.toLowerCase():""}`, s.qty, s.client])
     }
-    const tr = rows.map(([a, b, q, v], i) => `<tr><td class="nn">${i+1}</td><td><b>${J(a)}</b>${b?`<small>${J(b)}</small>`:""}</td><td class="r">${q?S(q)+" шт":""}</td><td class="r">${q>1?mt(v/q):""}</td><td class="r b">${mt(v)}</td></tr>`).join("");
+    let nTop = 0, nSub = 0;
+    const tr = rows.map(([a, b, q, v, sub]) => sub ? `<tr class="sub"><td class="nn">${nTop}.${++nSub}</td><td>${J(a)}${b?`<small>${J(b)}</small>`:""}</td><td class="r">${q?S(q)+" шт":""}</td><td class="r">${q>1?mt(v/q):""}</td><td class="r">${mt(v)}</td></tr>` : (nTop++, nSub = 0, `<tr><td class="nn">${nTop}</td><td><b>${J(a)}</b>${b?`<small>${J(b)}</small>`:""}</td><td class="r">${q?S(q)+" шт":""}</td><td class="r">${q>1?mt(v/q):""}</td><td class="r b">${mt(v)}</td></tr>`)).join("");
     let tiers = "";
     if (!n && Aa && B.batch) {
       const t = [1, 5, 10, 25, 50, 100].map(q => {
@@ -7032,7 +7256,7 @@ onmessage=e=>{const{id,pos,keys,fdm,light,hull}=e.data;if(hull){try{postMessage(
 h1{font-size:21px;margin:18px 0 4px;color:${bc}}h3{font-size:12px;margin:18px 0 8px;text-transform:uppercase;letter-spacing:.04em;color:#5b6670}
 .top{display:flex;gap:18px;margin-top:12px;align-items:flex-start}.pic{flex:0 0 230px;height:170px;border:1px solid #e1e5e9;border-radius:10px;background:#eef1f4;display:flex;align-items:center;justify-content:center;overflow:hidden}.pic img{max-width:100%;max-height:100%}
 .spec{flex:1;display:grid;grid-template-columns:1fr 1fr;gap:10px 18px;align-content:start}.spec div,.terms div{display:flex;flex-direction:column}.spec span,.terms span{font-size:10.5px;color:#5b6670;text-transform:uppercase;letter-spacing:.03em}.spec b,.terms b{font-weight:600}
-table{width:100%;border-collapse:collapse;margin-top:6px}th{font-size:10.5px;text-transform:uppercase;letter-spacing:.03em;color:#5b6670;text-align:left;padding:6px 8px;border-bottom:1.5px solid #1c2329}td{padding:8px;border-bottom:1px solid #e1e5e9;vertical-align:top}td small{display:block;color:#5b6670}td.nn{color:#8a949c;width:22px}.r{text-align:right;white-space:nowrap}th.r{text-align:right}.b{font-weight:700}
+table{width:100%;border-collapse:collapse;margin-top:6px}th{font-size:10.5px;text-transform:uppercase;letter-spacing:.03em;color:#5b6670;text-align:left;padding:6px 8px;border-bottom:1.5px solid #1c2329}td{padding:8px;border-bottom:1px solid #e1e5e9;vertical-align:top}tr.sub td{padding-top:4px;padding-bottom:4px;color:#5b6670;font-size:11.5px}tr.sub td:nth-child(2){padding-left:22px}td small{display:block;color:#5b6670}td.nn{color:#8a949c;width:22px}.r{text-align:right;white-space:nowrap}th.r{text-align:right}.b{font-weight:700}
 .tot{display:flex;justify-content:flex-end;margin-top:10px}.tot>div{min-width:250px;padding:12px 16px;border-radius:10px;background:${bc};color:#fff;text-align:right}.tot .v{font-size:22px;font-weight:800}.tot .k{font-size:11px;opacity:.85;text-transform:uppercase;letter-spacing:.04em}.tot-s{font-size:11px;opacity:.9}
 .tiers{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}.ti{border:1px solid #e1e5e9;border-radius:8px;padding:6px 8px;text-align:center}.ti span,.ti small{display:block;font-size:10.5px;color:#5b6670}.ti b{font-size:13px}.ti.on{border-color:${bc};box-shadow:inset 0 0 0 1px ${bc}}
 .terms{display:grid;grid-template-columns:repeat(3,1fr);gap:10px 18px;padding:12px 14px;border:1px solid #e1e5e9;border-radius:10px}
@@ -7255,10 +7479,24 @@ ${(m.shopInfo||"").trim()?`<div class="ft">${J(m.shopInfo.trim())}</div>`:""}
       }
     } else {
       const a = t.cost > 0 ? t.client / t.cost : 0;
-      e.push("Позиции:"), t.lines.forEach(({
+      e.push("Позиции:");
+      let nT = 0, nS = 0;
+      const sg = new Set;
+      loOrd(t.lines).forEach(({
         it: o,
         c: s
-      }, i) => e.push(`  ${i+1}. ${o.name} — ${Nt[s.tech].name}, ${s.mt.name}, ${S(s.qty)} шт × ${mt(s.cost*a/s.qty)}`)), e.push("", `Итого: ${mt(t.client)}`), t.minApplied && e.push(`Минимальная сумма заказа — ${mt(t.client)}, стоимость деталей ${mt(t.byMarkup*t.kCl)}`), n.tax && l.money.vat > 0 && e.push(`В том числе НДС ${l.money.vat}%: ${mt(t.vatAmt)}`)
+      }) => {
+        if (o.grp) {
+          if (!sg.has(o.grp)) {
+            sg.add(o.grp);
+            const gl = t.lines.filter(x => x.it.grp === o.grp), gq = +o.gq || 1, sum = gl.reduce((q, x) => q + x.c.cost * a, 0);
+            nT++, nS = 0, e.push(`  ${nT}. ${o.gname||"Изделие"} — ${S(gq)} шт × ${mt(sum/gq)}, в комплекте:`)
+          }
+          e.push(`     ${nT}.${++nS}. ${o.name} — ${s.mt.name}${o.incl&&o.incl.length?" (в составе: "+o.incl.join(", ")+")":""}, ${S(s.qty)} шт × ${mt(s.cost*a/s.qty)}`);
+          return
+        }
+        e.push(`  ${++nT}. ${o.name} — ${Nt[s.tech].name}, ${s.mt.name}${o.incl&&o.incl.length?" (в составе: "+o.incl.join(", ")+")":""}, ${S(s.qty)} шт × ${mt(s.cost*a/s.qty)}`)
+      }), e.push("", `Итого: ${mt(t.client)}`), t.minApplied && e.push(`Минимальная сумма заказа — ${mt(t.client)}, стоимость деталей ${mt(t.byMarkup*t.kCl)}`), n.tax && l.money.vat > 0 && e.push(`В том числе НДС ${l.money.vat}%: ${mt(t.vatAmt)}`)
     }
     return e.push("", At() ? `Срок изготовления: ${At()} ${la(At())} после согласования модели (ориентировочно до ${$n(xn(Date.now(),At()))}).` : l.blocks.schedule && (t.plan.mode !== "none" || t.plan.busy) ? `Срок готовности: ${Rt(t.plan.end)}${t.rush?" (срочный заказ)":""}.` : `Срок изготовления: около ${t.days} раб. дн. после согласования модели.`), (l.money.kpPay || "").trim() && e.push(`Условия оплаты: ${l.money.kpPay.trim()}`), +l.money.kpDays > 0 && e.push(`Предложение действительно до ${new Date(Date.now()+ +l.money.kpDays*864e5).toLocaleDateString("ru-RU")}.`), (l.money.shopInfo || "").trim() && e.push("", l.money.shopInfo.trim()), fe && !(l.money.kpTpl || "").trim() && e.push("", "Расчёт: калькулятор «Смета 3D», neroartnuar.github.io/Calculator-3d-printing"), (l.money.kpTpl || "").trim() ? loKpFill(l.money.kpTpl, t) : e.join(`
 `)
@@ -7359,6 +7597,7 @@ ${(m.shopInfo||"").trim()?`<div class="ft">${J(m.shopInfo.trim())}</div>`:""}
         ["dims", "Масштаб и размеры X / Y / Z", () => [...Ht("#scalePct"), ...Ht("#dimX"), ...Ht("#dimY"), ...Ht("#dimZ"), ...Ht("#scaleLock2")]],
         ["tFlat", "Кнопка «На грань»", () => Et("#btnFlat")],
         ["tFace", "Кнопка «Гранью на стол»", () => Et("#btnFace")],
+        ["tSplit", "Кнопка «Разбить на части»", () => Et("#btnSplit")],
         ["tOrient", "Кнопка «Подобрать»", () => Et("#btnOrient")],
         ["tPos", "Кнопка «Положение»", () => Et("#btnPos")],
         ["tRepair", "Кнопка «Починить»", () => Et("#btnRepair")],
@@ -8903,11 +9142,11 @@ uniform float uLayerH;`).replace("#include <color_fragment>", `#include <color_f
       loCur = null;
       return
     }
-    const it = Pe();
+    const it = Pe(), o = l.basket[i];
     it && (l.basket[i] = {
       ...it,
       id: loCur
-    })
+    }, ["grp", "gname", "gq", "per", "incl"].forEach(k => o[k] != null && (l.basket[i][k] = o[k])), o.grp && (l.basket[i].per = (+it.qty || 1) / (+o.gq || 1)))
   }
 
   function loStoreCur() {
@@ -8942,7 +9181,9 @@ uniform float uLayerH;`).replace("#include <color_fragment>", `#include <color_f
   function loLoad(id) {
     const g = loGeo.get(id);
     if (!g || !g.H) return !1;
-    je(!0), loCur = id, loApply(g.s), H = g.H, H.st || (H.st = vn(H.pos)), ne = null, f("scalePct").value = +((H.scale || 1) * 100).toFixed(2), f("unitSel").value = String(H.unit || 1), vi(), Ge(l.source), Ne(), Ln(), ge(), Me(), ft(), Sn(), at(), typeof loSaveM == "function" && loSaveM();
+    je(!0), loCur = id, loApply(g.s);
+    const b0 = l.basket.find(b => b.id === id);
+    b0 && +b0.qty > 0 && (l.part.qty = +b0.qty, b0.name && (l.part.name = b0.name)), H = g.H, H.st || (H.st = vn(H.pos)), ne = null, f("scalePct").value = +((H.scale || 1) * 100).toFixed(2), f("unitSel").value = String(H.unit || 1), vi(), Ge(l.source), Ne(), Ln(), ge(), Me(), ft(), Sn(), at(), typeof loSaveM == "function" && loSaveM();
     return !0
   }
 
@@ -9532,7 +9773,7 @@ uniform float uLayerH;`).replace("#include <color_fragment>", `#include <color_f
     } else v["тираж"] = `${S(t.qty)} шт`, v["позиции"] = "Позиции:\n" + t.lines.map(({
       it: o,
       c: x
-    }, i) => `  ${i+1}. ${o.name} — ${Nt[x.tech].name}, ${x.mt.name}, ${S(x.qty)} шт`).join("\n");
+    }, i) => `  ${i+1}. ${o.grp?(o.gname||"Изделие")+": ":""}${o.name} — ${Nt[x.tech].name}, ${x.mt.name}, ${S(x.qty)} шт${o.incl&&o.incl.length?" (в составе: "+o.incl.join(", ")+")":""}`).join("\n");
     v["итого"] = mt(t.client), v["моделирование"] = t.det && t.det.cad > .5 ? `В том числе моделирование ≈ ${S(+m.cadH||0,1)} ч: ${mt(t.det.cad*t.kCl)}` : "", v["минимум"] = t.minApplied ? `Минимальная сумма заказа — ${mt(t.client)}, стоимость деталей ${mt(t.byMarkup*t.kCl)}` : "", v["скидка"] = t.optD && !t.minApplied ? `С учётом скидки за объём ${loPc(t.optEff)}%` : "", v["ндс"] = n.tax && m.vat > 0 ? `В том числе НДС ${m.vat}%: ${mt(t.vatAmt)}` : "", v["тираж_таблица"] = a && n.batch ? "Цена за штуку при другом тираже:\n" + [1, 5, 10, 25, 50, 100].filter(q => q !== a.qty).map(q => {
       const i = en([{
         ...a,
@@ -10510,7 +10751,7 @@ uniform float uLayerH;`).replace("#include <color_fragment>", `#include <color_f
         c = Math.PI / 2,
         d = (i.dataset.rot === "x" ? r.makeRotationX(c) : i.dataset.rot === "y" ? r.makeRotationY(c) : r.makeRotationZ(c)).elements;
       Le(H.pos, d), Wt(i.dataset.rot === "z")
-    })), f("btnFlat").onclick = Os, f("btnFace").onclick = loFaceStart, document.addEventListener("keydown", i => {
+    })), f("btnFlat").onclick = Os, f("btnFace").onclick = loFaceStart, f("btnSplit").onclick = loSplit, document.addEventListener("keydown", i => {
       const g = i.target;
       (i.key === "f" || i.key === "F" || i.key === "а" || i.key === "А") && !i.ctrlKey && !i.metaKey && !i.altKey && !(g && (g.isContentEditable || /^(INPUT|SELECT|TEXTAREA)$/.test(g.tagName))) && f("dlg").hidden && !f("btnFace").hidden && f("btnFace").offsetParent && (i.preventDefault(), loFaceStart())
     }), f("btnOrient").onclick = Sa, f("btnRepair").onclick = La, f("btnOver").onclick = () => {
@@ -10640,6 +10881,23 @@ uniform float uLayerH;`).replace("#include <color_fragment>", `#include <color_f
         loDel(r.dataset.del);
         return
       }
+      const gd = i.target.closest("[data-gdel]");
+      if (gd) {
+        const ids = l.basket.filter(b => b.grp === gd.dataset.gdel).map(b => b.id);
+        ids.forEach(loDel), V(`Изделие удалено (${ids.length} ${loPl(ids.length,"деталь","детали","деталей")})`);
+        return
+      }
+      const gr = i.target.closest("[data-gren]");
+      if (gr) {
+        const g = gr.dataset.gren, b0 = l.basket.find(b => b.grp === g);
+        xe("Название изделия", `<label class="field"><span class="lbl">Название</span><span class="inp"><input id="grpName" value="${J(b0&&b0.gname||"")}" maxlength="80"></span></label>`, `<button class="btn ghost" type="button" id="grpNo">Отмена</button><button class="btn" type="button" id="grpOk">Сохранить</button>`);
+        const ok = () => {
+          const v = f("grpName").value.trim();
+          v && l.basket.forEach(b => b.grp === g && (b.gname = v)), Mt(), at()
+        };
+        f("grpOk").onclick = ok, f("grpNo").onclick = Mt, f("grpName").onkeydown = e => e.key === "Enter" && ok();
+        return
+      }
       const u = i.target.closest("[data-dup]");
       if (u) {
         loDup(u.dataset.dup);
@@ -10665,12 +10923,24 @@ uniform float uLayerH;`).replace("#include <color_fragment>", `#include <color_f
         c && m1 && (c.tech !== "sla" && !tt.has(c.tech) && m0 && m0.density > 0 && (c.grams = c.grams * m1.density / m0.density), c.tech === "sls" && c.vol > 0 && (c.grams = c.vol * m1.density), c.materialId = m1.id, delete c.chamber, at());
         return
       }
+      const gq = i.target.closest("[data-gq]");
+      if (gq) {
+        let d = Math.round(+gq.value);
+        d >= 1 || (d = 1), d > 1e5 && (d = 1e5);
+        for (const b of l.basket) {
+          if (b.grp !== gq.dataset.gq) continue;
+          const q = Math.max(1, Math.round((+b.per || 1) * d));
+          b.gq = d, b.id === loCur ? (l.part.qty = q, ft()) : b.qty = q
+        }
+        at(), loSaveM();
+        return
+      }
       const r = i.target.closest("[data-bq]");
       if (!r) return;
       const c = l.basket.find(d => d.id === r.dataset.bq);
       if (!c) return;
       let d = Math.round(+r.value);
-      d >= 1 || (d = 1), d > 1e5 && (d = 1e5), c.id === loCur ? (l.part.qty = d, ft()) : c.qty = d, at()
+      d >= 1 || (d = 1), d > 1e5 && (d = 1e5), c.grp && (c.per = d / (+c.gq || 1)), c.id === loCur ? (l.part.qty = d, ft()) : c.qty = d, at()
     }), f("tiers").addEventListener("click", i => {
       const r = i.target.closest("[data-qty]");
       r && (l.part.qty = +r.dataset.qty, ft(), at())
