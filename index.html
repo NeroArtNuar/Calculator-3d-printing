@@ -13,7 +13,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" integrity="sha512-dLxUelApnYxpLt6K2iomGngnHO83iUvZytA3YjDUCjT0HDOHKXnVYdf3hU4JjM8uEhxf9nD1/ey98U3t2vZ0qQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" integrity="sha512-XMVd28F1oH/O71fzwBnV7HucLxVwtxf26XV8P4wPk26EDxuGZ91N8bsOttmnomcCD3CS5ZMRL50H0GgOHvegtg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script>/* CDN недоступен или файл подменён — берём копии из репозитория */window.THREE||document.write('<script src="vendor/three-r128.min.js"><\/script>');window.JSZip||document.write('<script src="vendor/jszip-3.10.1.min.js"><\/script>');</script>
-<link rel="stylesheet" href="styles.css?v=4e7ac253">
+<link rel="stylesheet" href="styles.css?v=0c452aab">
 </head>
 <body>
 <div class="as-bar" id="asBar" hidden><span id="asBarT"></span> · <button class="as-bar-x" type="button" id="asBarX">Выйти из просмотра</button></div>
@@ -121,10 +121,15 @@
         <div class="u-col u-g10 u-min0">
           <div class="facts" id="facts"></div>
           <div class="part-chips" id="partChips" hidden></div>
+          <div id="basketBox" class="basket-side" hidden data-block="basket">
+            <div class="u-between u-mb6"><p class="sub">Детали заказа</p><span class="u-flex6"><button class="btn small" type="button" id="btnAddPart2">+ Деталь</button><button class="btn small ghost danger" type="button" id="btnClearBasket" title="Удалить все позиции и вернуться к расчёту одной детали">Очистить список</button></span></div>
+            <div class="basket" id="basket"></div>
+          </div>
           <button class="btn small u-start" type="button" id="btnAddPart" data-block="basket">+ Ещё деталь в заказ</button>
           <div class="alert info" id="autoOrient" hidden><p id="autoOrientT"></p><button class="btn small" type="button" id="autoOrientUndo">Как в файле</button></div>
           <div class="alerts" id="modelAlerts"></div>
-          <div class="grid adv u-cols2">
+          <details class="dims-box adv" id="dimsBox" open><summary>Размеры, масштаб, единицы <small id="dimsSum"></small></summary>
+          <div class="grid u-cols2">
             <label class="field"><span class="lbl">Единицы файла</span><span class="inp"><select id="unitSel"><option value="1">мм</option><option value="10">см</option><option value="25.4">дюймы</option><option value="1000">метры</option></select></span></label>
             <label class="field"><span class="lbl">Масштаб</span><span class="inp"><input id="scalePct" type="number" min="1" max="10000" step="1" value="100"><em>%</em></span></label>
             <label class="field"><span class="lbl">X</span><span class="inp"><input id="dimX" type="number" min="0.1" step="0.1"><em>мм</em></span></label>
@@ -132,6 +137,7 @@
             <label class="field"><span class="lbl">Z</span><span class="inp"><input id="dimZ" type="number" min="0.1" step="0.1"><em>мм</em></span></label>
             <label class="check u-end"><input type="checkbox" id="scaleLock2" checked>Пропорционально</label>
           </div>
+          </details>
         </div>
       </div>
       <div class="tool-panel" id="posPanel" hidden>
@@ -406,10 +412,6 @@
       <div class="mgr cmp" id="cmpBox" hidden></div>
       <div id="tiersBox" data-block="batch"><p class="sub u-mb6" id="tiersH">Цена за штуку при тираже</p><div class="tiers" id="tiers"></div><small class="cap tiers-note">«опт» — скидка за объём, «до минимума» — сумма поднята до минимального заказа.</small></div>
       <details class="pcmp" id="pcmpBox" hidden><summary><span class="sub">Эта деталь на других принтерах</span></summary><div class="pcmp-w"><table><thead><tr><th>Принтер</th><th class="r">Себест.</th><th class="r">Цена</th><th class="r">Срок</th></tr></thead><tbody id="pcmp"></tbody></table></div><small class="cap">Те же материал, качество и тираж. Зелёным — самая низкая себестоимость и самый короткий срок. Щёлкните строку, чтобы выбрать принтер.</small></details>
-      <div id="basketBox" hidden data-block="basket">
-        <div class="u-between u-mb6"><p class="sub">Детали заказа</p><span class="u-flex6"><button class="btn small" type="button" id="btnAddPart2">+ Деталь</button><button class="btn small ghost danger" type="button" id="btnClearBasket" title="Удалить все позиции и вернуться к расчёту одной детали">Очистить список</button></span></div>
-        <div class="basket" id="basket"></div>
-      </div>
       <div class="cli vyp" id="vypBox">
         <button class="btn small" type="button" id="vypShow">Показать выписку</button>
         <div class="vyp-gate" id="vypGate" hidden></div>
@@ -438,7 +440,7 @@
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-<script src="app.js?v=f4922991"></script>
+<script src="app.js?v=e5b8d1c6"></script>
 
 </body>
 </html>

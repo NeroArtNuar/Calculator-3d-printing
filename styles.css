@@ -3785,3 +3785,22 @@ textarea {
 @container (max-width: 380px) {
   .toolbar #btnLay .tb-l { display: none }
 }
+
+/* ===== Просмотр крупнее (×1.5), список деталей заказа — справа от модели ===== */
+.viewer-wrap { height: 450px }
+@media (max-width:520px) { .viewer-wrap { height: 340px } }
+.basket-side { display: flex; flex-direction: column; min-height: 0 }
+.basket-side .basket { max-height: 330px; overflow: auto; padding-right: 4px; scrollbar-width: thin }
+.basket-side .bi { padding: 8px 10px }
+.dims-box > summary { cursor: pointer; font-weight: 600; font-size: 13px; padding: 6px 0; list-style: revert }
+.dims-box > summary small { font-weight: 400; opacity: .7; margin-left: 6px }
+.dims-box[open] > summary { margin-bottom: 8px }
+@media (max-width:760px) { .basket-side .basket { max-height: 420px } }
+.basket-side .bi { flex-wrap: nowrap; gap: 8px }
+.basket-side .bi .n { flex: 1 1 auto; min-width: 0 }
+.basket-side .bi .n b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.basket-side .bi .n select { max-width: 118px !important }
+.basket-side .bi .inp { width: 66px !important }
+.basket-side .bi.bi-sub { margin-left: 14px }
+.basket input[type=number] { -moz-appearance: textfield; appearance: textfield }
+.basket input[type=number]::-webkit-inner-spin-button, .basket input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0 }

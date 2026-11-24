@@ -3392,6 +3392,7 @@ window.__SMETA_SITE__ = 1;
   }
   const ds = t => !!t && (t.tech === "sls" ? t.vol > 0 : tt.has(t.tech) ? t.ml > 0 : t.grams > 0);
   let Yt, ye, Fe, Lt, ct, He, En = !0;
+  const loCam = { tx: 0, tz: 0, r: 0 };
   const pt = {
     theta: .75,
     phi: 1,
@@ -3458,7 +3459,8 @@ window.__SMETA_SITE__ = 1;
   }
 
   function ma() {
-    Re && (Fe.position.set(pt.r * Math.sin(pt.phi) * Math.sin(pt.theta), pt.ty + pt.r * Math.cos(pt.phi), pt.r * Math.sin(pt.phi) * Math.cos(pt.theta)), Fe.lookAt(0, pt.ty, 0), zt = !0)
+    const tx = pt.tx || 0, tz = pt.tz || 0;
+    Re && (Fe.position.set(tx + pt.r * Math.sin(pt.phi) * Math.sin(pt.theta), pt.ty + pt.r * Math.cos(pt.phi), tz + pt.r * Math.sin(pt.phi) * Math.cos(pt.theta)), Fe.lookAt(tx, pt.ty, tz), zt = !0)
   }
 
   function Sn() {
@@ -3466,7 +3468,7 @@ window.__SMETA_SITE__ = 1;
     const t = H && H.st,
       e = ht(),
       n = t ? Math.max(t.dimX, t.dimY, t.dimZ, 30) : Math.max(e.bedX, e.bedY);
-    pt.r = Math.max(60, n * 2.4), pt.ty = t ? t.dimZ * .45 : 0, pt.theta = .75, pt.phi = 1, ma()
+    pt.r = Math.max(60, n * 2.4), pt.ty = t ? t.dimZ * .45 : 0, pt.theta = .75, pt.phi = 1, pt.tx = loCam.tx, pt.tz = loCam.tz, pt.r = Math.max(pt.r, loCam.r), ma()
   }
 
   function Ln() {
@@ -3497,7 +3499,7 @@ window.__SMETA_SITE__ = 1;
       transparent: !0,
       opacity: .35
     }));
-    r.position.y = a / 2, He.add(r), zt = !0
+    r.position.y = a / 2, He.add(r), He.userData.bk = [e, n, a].join("x"), zt = !0
   }
 
   function ge() {
@@ -6279,6 +6281,16 @@ onmessage=e=>{const{id,pos,keys,fdm,light,hull}=e.data;if(hull){try{postMessage(
     loFaceShow(null), v.classList.remove("face-pick");
     const b = f("btnFace");
     b && b.classList.remove("on"), f("btnLay") && f("btnLay").classList.remove("on"), loFace = null, msg && V(msg)
+  }
+
+  let loSideN = -1;
+
+  function loSideUi() {
+    const d = f("dimsBox"), n = l.blocks.basket ? (l.basket || []).length : 0;
+    if (!d) return;
+    (loSideN < 0 || !n !== !loSideN) && (d.open = !n), loSideN = n;
+    const s = f("dimsSum");
+    s && (s.textContent = H && H.st ? `${S(H.st.dimX,1)} × ${S(H.st.dimY,1)} × ${S(H.st.dimZ,1)} мм` : "")
   }
 
   function loTbL(b, s) {
@@ -9103,7 +9115,7 @@ uniform float uLayerH;`).replace("#include <color_fragment>", `#include <color_f
     } catch (t) {
       console.error(t), lt = null
     }
-    loSafe(() => kn() || qs()), loSafe(loSyncCur), loSafe(Ao), loSafe(() => Ae() && ce()), loSafe(Yc), loSafe(gt);
+    loSafe(() => kn() || qs()), loSafe(loSyncCur), loSafe(Ao), loSafe(loSideUi), loSafe(() => Ae() && ce()), loSafe(Yc), loSafe(gt);
     try {
       loCmp()
     } catch (t) {
@@ -9321,13 +9333,38 @@ uniform float uLayerH;`).replace("#include <color_fragment>", `#include <color_f
   }
 
   const loSoloG = {};
+  let loBeds = null;
+
+  function loPlateMat() {
+    return loPlateMat.m || (loPlateMat.m = new THREE.MeshBasicMaterial({ color: 0x8796a6, transparent: !0, opacity: .3, depthWrite: !1, side: THREE.DoubleSide }))
+  }
+
+  function loPlateLine() {
+    return loPlateLine.m || (loPlateLine.m = new THREE.LineBasicMaterial({ color: 0xf5a524, transparent: !0, opacity: .85 }))
+  }
+
+  function loPlateNo(n, x, y, w) {
+    loPlateNo.c || (loPlateNo.c = new Map);
+    let m = loPlateNo.c.get(n);
+    if (!m) {
+      const c = document.createElement("canvas");
+      c.width = 128, c.height = 64;
+      const g = c.getContext("2d");
+      g.fillStyle = "#f5a524", g.font = "bold 52px system-ui, Arial", g.textAlign = "center", g.textBaseline = "middle", g.fillText(String(n).padStart(2, "0"), 64, 34);
+      const tx = new THREE.CanvasTexture(c);
+      m = new THREE.MeshBasicMaterial({ map: tx, transparent: !0, depthWrite: !1, depthTest: !1 }), loPlateNo.c.set(n, m)
+    }
+    const p = new THREE.Mesh(new THREE.PlaneGeometry(w, w / 2), m);
+    return p.position.set(x, y, .3), p.userData.label = 1, p.renderOrder = 8, p
+  }
   let loAllView = !1;
 
   function loDraw() {
     if (!Re || !Lt || typeof THREE > "u") return;
-    loGrp || (loGrp = new THREE.Group, Lt.add(loGrp));
-    const pr = ht(),
-      solo = !loCur && !!H && !!H.st && !(l.basket || []).length,
+    loGrp || (loGrp = new THREE.Group, Lt.add(loGrp)), loBeds || (loBeds = new THREE.Group, ye.add(loBeds));
+    const pr = ht();
+    He && He.userData.bk !== [pr.bedX, pr.bedY, pr.bedZ].join("x") && (Ln(), loDk = "");
+    const solo = !loCur && !!H && !!H.st && !(l.basket || []).length,
       cid = solo ? "__solo" : loCur,
       G = id => id === "__solo" ? (loSoloG.H !== H && (loSoloG.H = H), loSoloG) : loGeo.get(id),
       all = solo ? [{
@@ -9340,9 +9377,16 @@ uniform float uLayerH;`).replace("#include <color_fragment>", `#include <color_f
       k = JSON.stringify([cid, loAllView, l.tech, pr.id, pr.bedX, pr.bedY, all.map(b => [b.id, b.tech, b.qty, (G(b.id).H || {}).ver])]);
     if (k === loDk) return;
     loDk = k;
-    for (; loGrp.children.length;) loGrp.remove(loGrp.children[0]);
+    for (; loGrp.children.length;) {
+      const c = loGrp.children[0];
+      loGrp.remove(c), c.userData.label && c.geometry.dispose()
+    }
+    for (; loBeds.children.length;) {
+      const c = loBeds.children[0];
+      loBeds.remove(c), c.userData.label && c.geometry.dispose()
+    }
     if (!cid || !H || !all.length || solo && all[0].qty < 2) {
-      He.position.set(0, 0, 0), loBed(""), zt = !0;
+      (loCam.tx || loCam.tz || loCam.r) && (loCam.tx = loCam.tz = loCam.r = 0, pt.tx = pt.tz = 0, ma()), He.position.set(0, 0, 0), loBed(""), zt = !0;
       return
     }
     const gap = tt.has(l.tech) ? 3 : 5,
@@ -9363,22 +9407,40 @@ uniform float uLayerH;`).replace("#include <color_fragment>", `#include <color_f
     }
     it.sort((a, b) => (b.id === cid) - (a.id === cid) || b.h - a.h);
     const BX = pr.bedX,
-      BY = pr.bedY;
+      BY = pr.bedY,
+      SP = Math.max(50, Math.min(BX, BY) * .4),
+      multiBed = l.tech !== "sls";
     let x = 0,
       y = 0,
       row = 0,
-      over = 0;
+      over = 0,
+      pi = 0;
     const pl = [];
     for (const p of it) {
-      if (x + p.w > BX + gap && x > 0 && (x = 0, y += row, row = 0), y + p.h > BY + gap || p.w > BX + gap) {
+      if (p.w > BX + gap || p.h > BY + gap) {
         over++;
         continue
       }
+      if (x + p.w > BX + gap && x > 0 && (x = 0, y += row, row = 0), y + p.h > BY + gap) {
+        if (!multiBed) {
+          over++;
+          continue
+        }
+        pi++, x = 0, y = 0, row = 0
+      }
       pl.push({
         ...p,
+        pi,
         cx: x + p.w / 2 - gap / 2 - BX / 2,
         cy: y + p.h / 2 - gap / 2 - BY / 2
       }), x += p.w, row = Math.max(row, p.h)
+    }
+    const nBeds = pl.length ? pl[pl.length - 1].pi + 1 : 1,
+      cols = Math.min(nBeds, Math.ceil(Math.sqrt(nBeds))),
+      off = i => [i % cols * (BX + SP), -Math.floor(i / cols) * (BY + SP)];
+    for (const p of pl) {
+      const [ox, oy] = off(p.pi);
+      p.cx += ox, p.cy += oy
     }
     const cur = pl.find(p => p.id === cid) || {
       cx: 0,
@@ -9402,11 +9464,41 @@ uniform float uLayerH;`).replace("#include <color_fragment>", `#include <color_f
       const m = new THREE.Mesh(loProxy(p.g), mt);
       m.position.set(p.cx - cur.cx, p.cy - cur.cy, 0), m.userData.pid = p.id, loGrp.add(m)
     }
-    if (pl.length > 1) {
+    /* столы 02, 03… рядом, как в OrcaSlicer, и номера столов */
+    if (nBeds > 1) {
+      const grid = He.children.filter(c => c.type === "LineSegments" && !(c.position.y > 1));
+      for (let i = 0; i < nBeds; i++) {
+        const [ox, oy] = off(i);
+        const pf = new THREE.Mesh(new THREE.PlaneGeometry(BX, BY), loPlateMat());
+        pf.rotation.x = -Math.PI / 2, pf.position.set(ox - cur.cx, -.4, -(oy - cur.cy)), pf.userData.label = 1, pf.renderOrder = -2, loBeds.add(pf);
+        const bo = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(-BX / 2, 0, -BY / 2), new THREE.Vector3(BX / 2, 0, -BY / 2), new THREE.Vector3(BX / 2, 0, BY / 2), new THREE.Vector3(-BX / 2, 0, BY / 2)]), loPlateLine());
+        bo.position.set(ox - cur.cx, .2, -(oy - cur.cy)), bo.userData.label = 1, loBeds.add(bo);
+        if (i) {
+          const b = new THREE.Group;
+          for (const c of grid) b.add(c.clone());
+          b.position.set(ox - cur.cx, 0, -(oy - cur.cy)), loBeds.add(b)
+        }
+        loGrp.add(loPlateNo(i + 1, ox + BX / 2 - cur.cx - BX * .13, oy - BY / 2 - cur.cy - BX * .08, BX * .26))
+      }
+    }
+    if (pl.length > 1 || nBeds > 1) {
       let ex = 0;
       for (const p of pl) ex = Math.max(ex, Math.abs(p.cx - cur.cx) + p.w / 2, Math.abs(p.cy - cur.cy) + p.h / 2);
-      pt.r = Math.max(pt.r, ex * 2.6), ma()
-    }
+      for (let i = 0; i < nBeds; i++) {
+        const [ox, oy] = off(i);
+        ex = Math.max(ex, Math.abs(ox - cur.cx) + BX / 2, Math.abs(oy - cur.cy) + BY / 2)
+      }
+      if (nBeds > 1) {
+        let x0 = 1 / 0, x1 = -1 / 0, y0 = 1 / 0, y1 = -1 / 0;
+        for (let i = 0; i < nBeds; i++) {
+          const [ox, oy] = off(i);
+          x0 = Math.min(x0, ox - BX / 2), x1 = Math.max(x1, ox + BX / 2), y0 = Math.min(y0, oy - BY / 2), y1 = Math.max(y1, oy + BY / 2)
+        }
+        loCam.tx = (x0 + x1) / 2 - cur.cx, loCam.tz = -((y0 + y1) / 2 - cur.cy), loCam.r = Math.max(x1 - x0, (y1 - y0) * 1.3) * 1.75
+      } else loCam.tx = loCam.tz = 0, loCam.r = ex * 2.6;
+      pt.tx = loCam.tx, pt.tz = loCam.tz, pt.r = Math.max(pt.r, loCam.r), ma()
+    } else loCam.tx = loCam.tz = loCam.r = 0, pt.tx = pt.tz = 0, ma();
+    const onFirst = pl.filter(p => p.pi === 0).length;
     const ot = {};
     for (const b of all) b.tech !== l.tech && (ot[Nt[b.tech].name] = (ot[Nt[b.tech].name] || 0) + 1);
     const os = Object.entries(ot).map(([n, c]) => `${n}: ${c}`).join(", ");
@@ -9420,7 +9512,9 @@ uniform float uLayerH;`).replace("#include <color_fragment>", `#include <color_f
         }
       })() : null,
       loN = loCi && Number.isFinite(loCi.plates) ? Math.max(1, Math.round(loCi.plates)) : Math.max(1, Math.ceil(loQ / Math.max(1, pl.length)));
-    loBed([solo ? (l.tech === "sls" ? `В камере: ${S(loQ)} шт · ${loN} ${loPl(loN,"запуск","запуска","запусков")} (детали в несколько ярусов)` : `На столе: ${S(Math.min(pl.length, loQ))} из ${S(loQ)} шт` + (loN > 1 ? ` · ${loN} ${loPl(loN,"стол","стола","столов")}` : "")) : `На столе ${Nt[l.tech].name}: ${S(pl.length)}${over ? ` из ${S(pl.length + over)}` : ""} шт` + (over ? ` · ещё ${S(Math.ceil(over / Math.max(1, pl.length)))} ${loPl(Math.ceil(over / Math.max(1, pl.length)),"стол","стола","столов")}` : ""), os ? `другие технологии — ${os} (выберите деталь в списке)` : ""].filter(Boolean).join(" · "), multi), zt = !0
+    const nb = Math.max(nBeds, loN && solo ? loN : 0),
+      cut = it.length >= 100 && (solo ? loQ : parts.reduce((q, b) => q + Math.max(1, Math.round(b.qty || 1)), 0)) > 100;
+    loBed([l.tech === "sls" ? (solo ? `В камере: ${S(loQ)} шт · ${loN} ${loPl(loN,"запуск","запуска","запусков")} (детали в несколько ярусов)` : `В камере ${Nt[l.tech].name}: ${S(pl.length)} шт`) : (over && !pl.length ? `Не помещается на стол ${S(BX)}×${S(BY)} мм` : `${S(pl.length)} шт на ${S(nb)} ${loPl(nb,"столе","столах","столах")}` + (nb > 1 ? ` · на первом ${S(onFirst)}` : "") + (over ? ` · ${S(over)} шт не помещаются` : "") + (cut ? " · показаны первые 100" : "")), os ? `другие технологии — ${os} (выберите деталь в списке)` : ""].filter(Boolean).join(" · "), multi), zt = !0
   }
 
   function loPartsInit() {
