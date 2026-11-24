@@ -2648,6 +2648,15 @@ window.__SMETA_SITE__ = 1;
         Ke = .6 + $e * .06 + v[z] * h;
       b.outer += _t, b.inner += ie, b.solid += Qt, b.infill += oe, b.travel += Ke, b.wait += Math.max(0, a.minLayer - $e - Ke), $[z] = $e + Ke
     }
+    {
+      /* тонкие стенки: линия шире стенки, и оценка выходила больше самой модели (до +6%).
+         Пластика в детали не может быть больше её объёма — подрезаем пропорционально */
+      const yv = y.outer + y.inner + y.solid + y.infill, tv = Te(t);
+      if (tv > 0 && yv > tv) {
+        const kk = tv / yv;
+        y.outer *= kk, y.inner *= kk, y.solid *= kk, y.infill *= kk
+      }
+    }
     let C = 0;
     t.userSup && !t.userSup.resin ? C = t.userSup.vol : e.supports === "auto" && t.overProj > 25 && (C = t.supColumn * (e.supportType === "tree" ? .09 : .15) + t.overProj * 2 * i * .8);
     const F = !t.userSup && l.sup && sn("fdm").key === "raft" ? (t.dimX + 6) * (t.dimY + 6) * .7 * .9 * .7 : 0,
@@ -7110,7 +7119,7 @@ onmessage=e=>{const{id,pos,keys,fdm,light,hull}=e.data;if(hull){try{postMessage(
     ];
     e.tax && L.push(["mgr", `Налог ${t.taxRev}%<small class="pro">${Q(s.net)} ÷ (1 − ${t.taxRev}%) − ${Q(s.net)}</small>`, Q(s.taxRev)]), e.tax && t.vat > 0 && L.push(["mgr", `НДС ${t.vat}%<small class="pro">${Q(s.net+s.taxRev)} × ${t.vat}%</small>`, Q(s.vatAmt)]), L.push([(s.profit >= 0 ? "profit" : "loss") + " strong mgr", `Прибыль · маржа ${S(s.margin,1)}%`, (s.profit >= 0 ? "+" : "−") + Q(Math.abs(s.profit))]);
     const P = [];
-    if (s.prepCl > .5 && (P.push(["cli", "Подготовка заказа<small>разово: приём, подготовка стола, снятие</small>", Q(s.prepCl)]), P.push(["cli", `Печать и материалы, ${S(s.qty)} шт<small>${Q((s.client-s.prepCl)/s.qty)} за штуку</small>`, Q(s.client - s.prepCl)])), s.det && s.det.cad > .5 && P.push(["cli", `Моделирование<small>≈ ${S(+l.money.cadH||0,1)} ч по ставке ${Q(+l.money.cadRate||0)}/ч</small>`, Q(s.det.cad * s.kCl)]), s.optCl > .5 && P.push(["cli opt", `Скидка за опт ${loPc(s.optEff)}% (от ${S(s.optQ)} шт)`, "−" + Q(s.optCl)]), s.rushCl > .5 && P.push(["cli", `Наценка за срочность +${S(s.rush*100)}%`, "+" + Q(s.rushCl)]), s.minApplied && P.push(["cli", `Минимальная сумма заказа<small>детали стоят ${Q(s.byMarkup*s.kCl)}, до минимума добавлено ${Q(s.client-s.byMarkup*s.kCl)}</small>`, Q(s.client)]), e.tax && t.vat > 0 && P.push(["cli", `в т.ч. НДС ${t.vat}%`, Q(s.vatAmt)]), L.push(...P), f("sumTotals").innerHTML = L.map(([M, E, k]) => `<div class="row ${M}"><div class="l">${E}</div><div class="r">${k}</div></div>`).join(""), !n && e.batch) {
+    if (s.prepCl > .5 && (P.push(["cli", "Подготовка заказа<small>разово: приём, подготовка стола, снятие</small>", Q(s.prepCl)]), P.push(["cli", `Печать и материалы, ${S(s.qty)} шт<small>${Q((s.client-s.prepCl)/s.qty)} за штуку</small>`, Q(s.client - s.prepCl)])), s.det && s.det.cad > .5 && P.push(["cli", `в т.ч. моделирование<small>≈ ${S(+l.money.cadH||0,1)} ч по ставке ${Q(+l.money.cadRate||0)}/ч</small>`, Q(s.det.cad * s.kCl)]), s.optCl > .5 && P.push(["cli opt", `в т.ч. скидка за опт ${loPc(s.optEff)}% (от ${S(s.optQ)} шт)`, "−" + Q(s.optCl)]), s.rushCl > .5 && P.push(["cli", `в т.ч. наценка за срочность +${S(s.rush*100)}%`, "+" + Q(s.rushCl)]), s.minApplied && P.push(["cli", `Минимальная сумма заказа<small>детали стоят ${Q(s.byMarkup*s.kCl)}, до минимума добавлено ${Q(s.client-s.byMarkup*s.kCl)}</small>`, Q(s.client)]), e.tax && t.vat > 0 && P.push(["cli", `в т.ч. НДС ${t.vat}%`, Q(s.vatAmt)]), L.push(...P), f("sumTotals").innerHTML = L.map(([M, E, k]) => `<div class="row ${M}"><div class="l">${E}</div><div class="r">${k}</div></div>`).join(""), !n && e.batch) {
       const M = en([{
         ...a,
         qty: 1
@@ -9641,7 +9650,7 @@ uniform float uLayerH;`).replace("#include <color_fragment>", `#include <color_f
       loN = loCi && Number.isFinite(loCi.plates) ? Math.max(1, Math.round(loCi.plates)) : Math.max(1, Math.ceil(loQ / Math.max(1, pl.length)));
     const nb = Math.max(nBeds, loN && solo ? loN : 0),
       cut = it.length >= 100 && (solo ? loQ : parts.reduce((q, b) => q + Math.max(1, Math.round(b.qty || 1)), 0)) > 100;
-    loBed([l.tech === "sls" ? (solo ? `В камере: ${S(loQ)} шт · ${loN} ${loPl(loN,"запуск","запуска","запусков")} (детали в несколько ярусов)` : `В камере ${Nt[l.tech].name}: ${S(pl.length)} шт`) : (over && !pl.length ? `Не помещается на стол ${S(BX)}×${S(BY)} мм` : `${S(pl.length)} шт на ${S(nb)} ${loPl(nb,"столе","столах","столах")}` + (nb > 1 ? ` · на первом ${S(onFirst)}` : "") + (over ? ` · ${S(over)} шт не помещаются` : "") + (cut ? " · показаны первые 100" : "")), os ? `другие технологии — ${os} (выберите деталь в списке)` : ""].filter(Boolean).join(" · "), multi), zt = !0
+    loBed([l.tech === "sls" ? (solo ? `В камере: ${S(loQ)} шт · ${loN} ${loPl(loN,"запуск","запуска","запусков")} (детали в несколько ярусов)` : `В камере ${Nt[l.tech].name}: ${S(pl.length)} шт`) : (over && !pl.length ? `Не помещается на стол ${S(BX)}×${S(BY)} мм` : `${S(cut ? (solo ? loQ : parts.reduce((q, b) => q + Math.max(1, Math.round(b.qty || 1)), 0)) : pl.length)} шт на ${S(nb)} ${loPl(nb,"столе","столах","столах")}` + (nb > 1 ? ` · на первом ${S(onFirst)}` : "") + (over ? ` · ${S(over)} шт не помещаются` : "") + (cut ? " · на картинке первые 100" : "")), os ? `другие технологии — ${os} (выберите деталь в списке)` : ""].filter(Boolean).join(" · "), multi), zt = !0
   }
 
   function loPartsInit() {
