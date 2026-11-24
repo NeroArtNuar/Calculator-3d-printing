@@ -3757,3 +3757,31 @@ textarea {
 .sp-list input, .sp-list select { font: inherit; padding: 5px 8px; border-radius: 7px; border: 1px solid var(--line, #444); background: var(--bg2, transparent); color: inherit; min-width: 0; width: 100% }
 .sp-ph { opacity: .6; font-size: .9em }
 @media (max-width: 640px) { .sp-e { grid-template-columns: 56px 1fr 1fr; padding-left: 4px } }
+
+/* ===== Панель инструментов просмотра: значки + подписи, меню «Положить» ===== */
+#viewerWrap { container-type: inline-size }
+.toolbar .tb { display: inline-flex; align-items: center; gap: 5px; padding: 5px 8px; white-space: nowrap }
+.toolbar .tb .ic, .tb-menu .ic { width: 16px; height: 16px; flex: 0 0 auto; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round }
+.toolbar .tb-ico .tb-l { display: none }
+.toolbar .tb-car { font-size: 9px; opacity: .7; margin-left: -1px }
+.toolbar .tb.open { background: rgba(255, 255, 255, .16) }
+.toolbar.tb-main, .toolbar.tb-view { flex-wrap: nowrap; align-items: center }
+.tb-sep { width: 1px; align-self: stretch; margin: 3px 3px; background: rgba(255, 255, 255, .18) }
+.toolbar .clear-bed.sure .tb-l { display: inline }
+.tb-dd { display: contents }
+.tb-menu { position: fixed; z-index: 60; min-width: 250px; padding: 5px; border-radius: 10px; background: rgba(18, 26, 33, .97); box-shadow: 0 10px 30px rgba(0, 0, 0, .35); border: 1px solid rgba(255, 255, 255, .08); display: flex; flex-direction: column; gap: 2px }
+.tb-menu[hidden] { display: none }
+.tb-menu .mi { display: flex; align-items: center; gap: 10px; text-align: left; border: 0; background: transparent; color: #e7eef2; padding: 8px 10px; border-radius: 7px; cursor: pointer; font: 500 12.5px var(--f-body) }
+.tb-menu .mi:hover, .tb-menu .mi:focus-visible { background: rgba(255, 255, 255, .1); outline: none }
+.tb-menu .mi .ic { width: 20px; height: 20px; color: #f5a524 }
+.tb-menu .mi span { display: flex; flex-direction: column; line-height: 1.25 }
+.tb-menu .mi small { opacity: .62; font-size: 11px; font-weight: 400 }
+.tb-menu .mi.on { background: rgba(240, 100, 124, .22) }
+@container (max-width: 640px) {
+  .toolbar .tb-l { display: none }
+  .toolbar #btnLay .tb-l { display: inline }
+  .toolbar .tb { padding: 6px 7px }
+}
+@container (max-width: 380px) {
+  .toolbar #btnLay .tb-l { display: none }
+}

@@ -13,7 +13,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" integrity="sha512-dLxUelApnYxpLt6K2iomGngnHO83iUvZytA3YjDUCjT0HDOHKXnVYdf3hU4JjM8uEhxf9nD1/ey98U3t2vZ0qQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" integrity="sha512-XMVd28F1oH/O71fzwBnV7HucLxVwtxf26XV8P4wPk26EDxuGZ91N8bsOttmnomcCD3CS5ZMRL50H0GgOHvegtg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script>/* CDN недоступен или файл подменён — берём копии из репозитория */window.THREE||document.write('<script src="vendor/three-r128.min.js"><\/script>');window.JSZip||document.write('<script src="vendor/jszip-3.10.1.min.js"><\/script>');</script>
-<link rel="stylesheet" href="styles.css?v=3424111a">
+<link rel="stylesheet" href="styles.css?v=4e7ac253">
 </head>
 <body>
 <div class="as-bar" id="asBar" hidden><span id="asBarT"></span> · <button class="as-bar-x" type="button" id="asBarX">Выйти из просмотра</button></div>
@@ -83,15 +83,21 @@
           <div id="viewer"></div>
           <div class="ov tl"><span class="pill" id="pillName">—</span><span class="pill" id="loBed" hidden></span></div>
           <div class="ov bl">
-            <div class="toolbar">
-              <button type="button" class="adv" id="btnFlat" title="Положить на самую большую плоскую грань">На грань</button><button type="button" class="adv" id="btnFace" title="Нажмите, потом выберите на модели грань — модель ляжет ею на стол (клавиша F)">Гранью на стол</button>
-              <button type="button" id="btnOrient" title="Выбрать самое выгодное положение для текущей технологии">Подобрать</button>
-              <button type="button" class="adv" id="btnPos" title="Повороты на любой угол и подбор положения по цели">Положение</button>
-              <button type="button" class="adv" id="btnSplit" title="Сборка из нескольких тел: разделить на изделия и детали для заказа">Разбить на части</button><button type="button" id="btnRepair" title="Закрыть дыры, развернуть нормали, убрать лишние грани">Починить</button>
-              <button type="button" class="adv" id="btnSup" title="Поддержки, плот и острова" data-tech="fdm sla dlp lcd">Поддержки</button>
-              <button type="button" id="btnScale" title="Изменить масштаб модели">Масштаб</button>
+            <div class="toolbar tb-main">
+              <div class="tb-dd"><button type="button" class="tb" id="btnLay" aria-haspopup="menu" aria-expanded="false" title="Как положить модель на стол"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 20h18"/><rect x="6" y="11" width="12" height="7" rx="1.5"/><path d="M12 3v5M9.5 5.5 12 8l2.5-2.5"/></svg><span class="tb-l">Положить</span><span class="tb-car" aria-hidden="true">▾</span></button>
+                <div class="tb-menu" id="layMenu" role="menu" hidden>
+                  <button type="button" role="menuitem" class="mi adv" id="btnFace" title="Нажмите, потом выберите на модели грань — модель ляжет ею на стол (клавиша F)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 20h18"/><path d="M6 17 12 7l6 10z"/><path d="M6 17h12" stroke-width="3"/></svg><span><b>Гранью на стол</b><small>выберите грань мышкой · клавиша F</small></span></button>
+                  <button type="button" role="menuitem" class="mi" id="btnOrient" title="Выбрать самое выгодное положение для текущей технологии"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.9 4.6L18.5 9.5l-4.6 1.9L12 16l-1.9-4.6L5.5 9.5l4.6-1.9z"/><path d="M19 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/></svg><span><b>Подобрать лучшее</b><small>само выберет выгодное положение</small></span></button>
+                  <button type="button" role="menuitem" class="mi adv" id="btnFlat" title="Положить на самую большую плоскую грань"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 20h18"/><rect x="5" y="12" width="14" height="6" rx="1"/></svg><span><b>На самую большую грань</b><small>быстро, без перебора</small></span></button>
+                  <button type="button" role="menuitem" class="mi adv" id="btnPos" title="Повороты на любой угол и подбор положения по цели"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 4v5h-5"/></svg><span><b>Повернуть точно…</b><small>углы по осям и цель подбора</small></span></button>
+                </div>
+              </div>
+              <button type="button" class="tb" id="btnScale" title="Изменить масштаб модели" aria-label="Масштаб"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 14v6h6"/><path d="M20 10V4h-6"/><path d="M4 20 20 4"/></svg><span class="tb-l">Масштаб</span></button>
+              <button type="button" class="tb adv" id="btnSplit" title="Сборка из нескольких тел: разделить на изделия и детали для заказа" aria-label="Разбить"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/><path d="M14 4h6v6M4 14v6h6" stroke-dasharray="2 2.2"/></svg><span class="tb-l">Разбить</span></button>
+              <button type="button" class="tb" id="btnRepair" title="Закрыть дыры, развернуть нормали, убрать лишние грани" aria-label="Починить"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3.5 17.5l3 3 5.8-5.8a4 4 0 0 0 5.4-5.4l-2.4 2.4-2.6-.5-.5-2.6z"/></svg><span class="tb-l">Починить</span></button>
+              <button type="button" class="tb adv" id="btnSup" title="Поддержки, плот и острова" aria-label="Поддержки" data-tech="fdm sla dlp lcd"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16M4 20h16"/><path d="M7.5 5v15M12 5v15M16.5 5v15" stroke-dasharray="2.5 1.6"/></svg><span class="tb-l">Поддержки</span></button>
             </div>
-            <div class="toolbar"><button type="button" id="btnOver" class="on" data-tech="fdm sla dlp lcd" title="Подсветить нависания круче 45°">Нависания</button><button type="button" id="btnCam" title="Вернуть камеру">⟲</button><button type="button" id="btnClearBed" class="clear-bed" title="Убрать все модели со стола и из списка заказа">Очистить стол</button></div>
+            <div class="toolbar tb-view"><button type="button" class="tb on" id="btnOver" title="Подсветить нависания круче 45°" aria-label="Нависания" data-tech="fdm sla dlp lcd"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V9h16"/><path d="M8 9l3 4M12 9l3 4M16 9l3 4"/></svg><span class="tb-l">Нависания</span></button><button type="button" class="tb tb-ico" id="btnCam" title="Вернуть камеру" aria-label="Камера"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1"/><path d="M3.5 4v5h5"/></svg><span class="tb-l">Камера</span></button><span class="tb-sep" aria-hidden="true"></span><button type="button" class="tb clear-bed tb-ico" id="btnClearBed" title="Убрать все модели со стола и из списка заказа" aria-label="Очистить стол"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6.5 7l1 13h9l1-13M10 11v5M14 11v5"/></svg><span class="tb-l">Очистить стол</span></button></div>
           </div>
           <div class="pop" id="scalePop" hidden>
             <p class="pop-h">Масштаб <b id="scaleVal">100%</b></p>
@@ -432,7 +438,7 @@
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-<script src="app.js?v=decd3580"></script>
+<script src="app.js?v=f4922991"></script>
 
 </body>
 </html>

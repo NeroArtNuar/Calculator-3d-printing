@@ -6278,7 +6278,27 @@ onmessage=e=>{const{id,pos,keys,fdm,light,hull}=e.data;if(hull){try{postMessage(
     v.removeEventListener("pointermove", loFace.mv), v.removeEventListener("pointerdown", loFace.dn, !0), v.removeEventListener("pointerup", loFace.up, !0), document.removeEventListener("keydown", loFace.key, !0);
     loFaceShow(null), v.classList.remove("face-pick");
     const b = f("btnFace");
-    b && b.classList.remove("on"), loFace = null, msg && V(msg)
+    b && b.classList.remove("on"), f("btnLay") && f("btnLay").classList.remove("on"), loFace = null, msg && V(msg)
+  }
+
+  function loTbL(b, s) {
+    const x = b && b.querySelector(".tb-l");
+    x ? x.textContent = s : b && (b.textContent = s)
+  }
+
+  /* меню «Положить» */
+  function loLayMenu(open) {
+    const b = f("btnLay"), m = f("layMenu");
+    if (!b || !m) return;
+    open = open ?? m.hidden;
+    if (open) {
+      const vis = [...m.querySelectorAll(".mi")].filter(x => !x.hidden && getComputedStyle(x).display !== "none");
+      if (vis.length === 1) return vis[0].click();
+      m.hidden = !1;
+      const r = b.getBoundingClientRect(), h = m.offsetHeight, w = m.offsetWidth;
+      m.style.left = Math.max(6, Math.min(innerWidth - w - 6, r.left)) + "px", m.style.top = (r.top - h - 6 > 6 ? r.top - h - 6 : r.bottom + 6) + "px"
+    } else m.hidden = !0;
+    b.setAttribute("aria-expanded", open ? "true" : "false"), b.classList.toggle("open", !!open)
   }
 
   function loFaceStart() {
@@ -6315,7 +6335,7 @@ onmessage=e=>{const{id,pos,keys,fdm,light,hull}=e.data;if(hull){try{postMessage(
     v.addEventListener("pointermove", loFace.mv), v.addEventListener("pointerdown", loFace.dn, !0), v.addEventListener("pointerup", loFace.up, !0), document.addEventListener("keydown", loFace.key, !0);
     v.classList.add("face-pick"), loFaceTab();
     const b = f("btnFace");
-    b && b.classList.add("on"), V("Наведите на грань модели — она подсветится зелёным. Нажмите, и модель ляжет ею на стол. Esc — отмена")
+    b && b.classList.add("on"), f("btnLay") && f("btnLay").classList.add("on"), V("Наведите на грань модели — она подсветится зелёным. Нажмите, и модель ляжет ею на стол. Esc — отмена")
   }
 
 
@@ -10765,7 +10785,13 @@ uniform float uLayerH;`).replace("#include <color_fragment>", `#include <color_f
         c = Math.PI / 2,
         d = (i.dataset.rot === "x" ? r.makeRotationX(c) : i.dataset.rot === "y" ? r.makeRotationY(c) : r.makeRotationZ(c)).elements;
       Le(H.pos, d), Wt(i.dataset.rot === "z")
-    })), f("btnFlat").onclick = Os, f("btnFace").onclick = loFaceStart, f("btnSplit").onclick = loSplit, document.addEventListener("keydown", i => {
+    })), f("btnFlat").onclick = Os, document.body.appendChild(f("layMenu")), f("btnLay").onclick = e => (e.stopPropagation(), loLayMenu()), f("layMenu").addEventListener("click", e => {
+      e.target.closest(".mi") && loLayMenu(!1)
+    }), document.addEventListener("pointerdown", e => {
+      !f("layMenu").hidden && !e.target.closest("#layMenu, #btnLay") && loLayMenu(!1)
+    }), document.addEventListener("keydown", e => {
+      e.key === "Escape" && !f("layMenu").hidden && loLayMenu(!1)
+    }), addEventListener("scroll", () => f("layMenu").hidden || loLayMenu(!1), !0), addEventListener("resize", () => f("layMenu").hidden || loLayMenu(!1)), f("btnFace").onclick = loFaceStart, f("btnSplit").onclick = loSplit, document.addEventListener("keydown", i => {
       const g = i.target;
       (i.key === "f" || i.key === "F" || i.key === "а" || i.key === "А") && !i.ctrlKey && !i.metaKey && !i.altKey && !(g && (g.isContentEditable || /^(INPUT|SELECT|TEXTAREA)$/.test(g.tagName))) && f("dlg").hidden && !f("btnFace").hidden && f("btnFace").offsetParent && (i.preventDefault(), loFaceStart())
     }), f("btnOrient").onclick = Sa, f("btnRepair").onclick = La, f("btnOver").onclick = () => {
@@ -10977,12 +11003,12 @@ uniform float uLayerH;`).replace("#include <color_fragment>", `#include <color_f
     }), f("btnSettings").onclick = ir, f("btnClearBed").onclick = async () => {
       const i = f("btnClearBed");
       if (!i.dataset.sure) {
-        i.dataset.sure = 1, i.classList.add("sure"), i.textContent = "Точно убрать?", V("Нажмите ещё раз — все модели уйдут со стола и из списка заказа"), setTimeout(() => {
-          delete i.dataset.sure, i.classList.remove("sure"), i.textContent = "Очистить стол"
+        i.dataset.sure = 1, i.classList.add("sure"), loTbL(i, "Точно убрать?"), V("Нажмите ещё раз — все модели уйдут со стола и из списка заказа"), setTimeout(() => {
+          delete i.dataset.sure, i.classList.remove("sure"), loTbL(i, "Очистить стол")
         }, 3500);
         return
       }
-      delete i.dataset.sure, i.classList.remove("sure"), i.textContent = "Очистить стол";
+      delete i.dataset.sure, i.classList.remove("sure"), loTbL(i, "Очистить стол");
       l.basket = [], loCur = null, loAllView = !1, loGeo.forEach(g => (g.geom && g.geom.dispose(), g.px && g.px.dispose())), loGeo.clear(), delete loSoloG.px, loGrp && loGrp.clear(), loDk = "", clearTimeout(loSt), await loDB.del(), nt.del("lo.parts"), l.part.qty = 1;
       const q = f("qtyInp");
       q && (q.value = 1);
