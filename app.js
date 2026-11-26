@@ -6452,7 +6452,7 @@ onmessage=e=>{const{id,pos,keys,fdm,light,hull}=e.data;if(hull){try{postMessage(
     if (loThumb.c.has(key)) return loThumb.c.get(key);
     let r = "";
     if (!loThumb.no) try {
-      const W = 128;
+      const W = own && own.W || 128;
       if (!loThumb.r) {
         const R = new THREE.WebGLRenderer({ antialias: !0, alpha: !0, preserveDrawingBuffer: !0 });
         R.setPixelRatio(1), R.setSize(W, W), R.setClearColor(0, 0);
@@ -6462,6 +6462,7 @@ onmessage=e=>{const{id,pos,keys,fdm,light,hull}=e.data;if(hull){try{postMessage(
         loThumb.r = { R, sc, d1, d2 }, sc.add(d1), sc.add(d2)
       }
       const { R, sc, d1, d2 } = loThumb.r, g = new THREE.BufferGeometry;
+      R.setSize(W, W);
       const pos = own ? own.pos : loSplitPos(P, shells);
       g.setAttribute("position", new THREE.BufferAttribute(pos, 3)), g.computeVertexNormals(), g.computeBoundingBox();
       const bb = g.boundingBox, c = bb.getCenter(new THREE.Vector3), sz = bb.getSize(new THREE.Vector3), dm = [sz.x, sz.y, sz.z],
@@ -6483,7 +6484,7 @@ onmessage=e=>{const{id,pos,keys,fdm,light,hull}=e.data;if(hull){try{postMessage(
       console.warn("Смета 3D: эскиз через WebGL не получился, рисую упрощённо", e), loThumb.no = !0
     }
     if (!r || r.length < 400) try {
-      r = loThumb2D(own ? own.pos : loSplitPos(P, shells))
+      r = loThumb2D(own ? own.pos : loSplitPos(P, shells), own && own.W)
     } catch (e) {
       console.error(e)
     }
@@ -6491,8 +6492,8 @@ onmessage=e=>{const{id,pos,keys,fdm,light,hull}=e.data;if(hull){try{postMessage(
   }
 
   /* запасной эскиз без WebGL: проекция с заливкой и светом, дальние грани рисуются первыми */
-  function loThumb2D(pos) {
-    const W = 128, n = pos.length / 9, st = Math.max(1, Math.ceil(n / 2e4)),
+  function loThumb2D(pos, W0) {
+    const W = W0 || 128, n = pos.length / 9, st = Math.max(1, Math.ceil(n / 2e4)),
       dx = .8, dy = -1, dz = .75, L = Math.hypot(dx, dy, dz), D = [dx / L, dy / L, dz / L],
       U0 = [-D[0] * D[2], -D[1] * D[2], 1 - D[2] * D[2]], ul = Math.hypot(...U0), U = U0.map(v => v / ul),
       R = [U[1] * D[2] - U[2] * D[1], U[2] * D[0] - U[0] * D[2], U[0] * D[1] - U[1] * D[0]],
@@ -7409,8 +7410,8 @@ onmessage=e=>{const{id,pos,keys,fdm,light,hull}=e.data;if(hull){try{postMessage(
       no = no0 || loKpNo(loKpSeq().n + 1),
       cli = (cli0 ?? (f("kpClient") ? f("kpClient").value : "")).trim(),
       shop = (m.shopName || "").trim(),
-      img = loSnapPng(),
       n = l.basket.length > 0,
+      img = n ? "" : (H && H.pos && H.pos.length >= 9 ? loThumb(null, null, null, { k: "kp:" + H.ver + ":" + H.pos.length, pos: H.pos, W: 340 }) : "") || loSnapPng(),
       rows = [];
     if (n) {
       const W = x => (x.cost - x.prep) * (1 + (+m.markup || 0) / 100) + x.prep * (1 + s.prepMk / 100),
@@ -7440,7 +7441,7 @@ onmessage=e=>{const{id,pos,keys,fdm,light,hull}=e.data;if(hull){try{postMessage(
       rows.push([a ? a.name : "Деталь", `${Nt[k.tech].name} · ${k.mt.name}${a&&a.color?" · "+a.color.toLowerCase():""}`, s.qty, s.client])
     }
     let nTop = 0, nSub = 0;
-    const tr = rows.map(([a, b, q, v, sub, pic]) => sub ? `<tr class="sub"><td class="nn">${nTop}.${++nSub}</td><td>${pic?`<img class="kp-pic" src="${pic}" alt="">`:""}${J(a)}${b?`<small>${J(b)}</small>`:""}</td><td class="r">${q?S(q)+" шт":""}</td><td class="r">${q>1?mt(v/q):""}</td><td class="r">${mt(v)}</td></tr>` : (nTop++, nSub = 0, `<tr><td class="nn">${nTop}</td><td>${pic?`<img class="kp-pic" src="${pic}" alt="">`:""}<b>${J(a)}</b>${b?`<small>${J(b)}</small>`:""}</td><td class="r">${q?S(q)+" шт":""}</td><td class="r">${q>1?mt(v/q):""}</td><td class="r b">${mt(v)}</td></tr>`)).join("");
+    const tr = rows.map(([a, b, q, v, sub, pic]) => sub ? `<tr class="sub"><td class="nn">${nTop}.${++nSub}</td><td>${pic?`<img class="kp-pic" src="${pic}" alt="">`:""}${J(a)}${b?`<small>${J(b)}</small>`:""}</td><td class="r">${q?S(q)+" шт":""}</td><td class="r">${q>=1?mt(v/q):""}</td><td class="r">${mt(v)}</td></tr>` : (nTop++, nSub = 0, `<tr><td class="nn">${nTop}</td><td>${pic?`<img class="kp-pic" src="${pic}" alt="">`:""}<b>${J(a)}</b>${b?`<small>${J(b)}</small>`:""}</td><td class="r">${q?S(q)+" шт":""}</td><td class="r">${q>=1?mt(v/q):""}</td><td class="r b">${mt(v)}</td></tr>`)).join("");
     let tiers = "";
     if (!n && Aa && B.batch) {
       const t = [1, 5, 10, 25, 50, 100].map(q => {
