@@ -3894,7 +3894,7 @@ window.__SMETA_SITE__ = 1;
         if (mp && s && s.length >= 9) {
           for (const [q, pp] of mp.entries()) await loAddGeom(s.slice(pp.a, pp.b), pp.name || o + " · " + (q + 1));
           const mg = loMergeDup();
-          V(`${n.name}: ${mp.length} объектов — отдельными деталями заказа${mg ? `, одинаковые объединены (${S(mp.length - mg)} позиций)` : ""}`);
+          V(`${n.name}: ${mp.length} объектов — отдельными деталями заказа${mg ? `, одинаковые объединены (${S(mp.length - mg)} ${loPl(mp.length - mg,"позиция","позиции","позиций")})` : ""}`);
           continue
         }
         if (!s || s.length < 9) {
@@ -6676,6 +6676,7 @@ onmessage=e=>{const{id,pos,keys,fdm,light,hull}=e.data;if(hull){try{postMessage(
   /* понятные названия частей: по форме и по стороне, где деталь стоит на корпусе */
   function loShape(c, attached) {
     const d = [...c.dim].sort((a, b) => a - b), box = Math.max(d[0] * d[1] * d[2], 1e-9), fill = c.vol / box;
+    if (d[1] < .3 * d[2] && d[0] > .4 * d[1]) return "Стойка";
     if (d[0] < .15 * d[2]) return d[1] / d[2] > .85 && fill < .35 ? "Кольцо" : attached ? "Накладка" : "Пластина";
     if (d[0] / d[2] > .8) return attached ? "Вставка" : "Куб";
     if (d[0] < .35 * d[2]) return "Пластина";
@@ -6701,6 +6702,19 @@ onmessage=e=>{const{id,pos,keys,fdm,light,hull}=e.data;if(hull){try{postMessage(
     for (const x of list) cnt.get(key(x)) > 1 && (k.set(key(x), (k.get(key(x)) || 0) + 1), x.name = x.base + " " + k.get(key(x)))
   }
 
+  /* одинаковые тела (форма, объём, размеры) — одна деталь с количеством */
+  function loTwins(list) {
+    const out = [], same = (a, b) => Math.abs(a.tris.length - b.tris.length) <= Math.max(2, a.tris.length * .002) && Math.abs(a.vol - b.vol) <= Math.max(5, a.vol * .005) && (() => {
+      const x = [...a.dim].sort((p, q) => p - q), y = [...b.dim].sort((p, q) => p - q);
+      return x.every((v, i) => Math.abs(v - y[i]) <= Math.max(.2, v * .005))
+    })();
+    for (const c of list) {
+      const cl = out.find(o => same(o[0], c));
+      cl ? cl.push(c) : out.push([c])
+    }
+    return out
+  }
+
   function loSplitPlan(sh) {
     const big = sh[0].vol, isMain = c => c.vol >= Math.max(500, big * .08),
       mains = sh.filter(isMain), smalls = sh.filter(c => !isMain(c)),
@@ -6724,15 +6738,15 @@ onmessage=e=>{const{id,pos,keys,fdm,light,hull}=e.data;if(hull){try{postMessage(
       groups.push({ base: gb === "Деталь" ? "Изделие" : gb, name: gb === "Деталь" ? "Изделие" : gb });
       E.push({ base: "Корпус", name: "Корпус", shells: [g.main], g: id, main: !0, print: "sep" });
       const letters = g.att.filter(isTxt), rest = g.att.filter(c => !isTxt(c)).sort((a, b) => b.vol - a.vol);
-      for (const c of rest) {
-        const b = loShape(c, !0) + " " + loSide(c, g.main);
-        E.push({ base: b, name: b, shells: [c], g: id, print: "sep" })
+      for (const cl of loTwins(rest)) {
+        const c = cl[0], b = cl.length > 1 ? loShape(c, !0) : loShape(c, !0) + " " + loSide(c, g.main);
+        E.push({ base: b, name: b, shells: [c], all: cl, count: cl.length, g: id, print: "sep" })
       }
       letters.length && E.push({ base: "Надпись", name: "Надпись", shells: letters, g: id, print: "sep" })
     }
-    for (const c of loose.filter(c => !isTxt(c))) {
-      const b = loShape(c, !1);
-      E.push({ base: b, name: b, shells: [c], g: -1, print: "sep" })
+    for (const cl of loTwins(loose.filter(c => !isTxt(c)))) {
+      const b = loShape(cl[0], !1);
+      E.push({ base: b, name: b, shells: [cl[0]], all: cl, count: cl.length, g: -1, print: "sep" })
     }
     const lt = loose.filter(isTxt);
     lt.length && E.push({ base: "Надпись", name: "Надпись", shells: lt, g: -1, print: "sep" });
@@ -6774,7 +6788,7 @@ onmessage=e=>{const{id,pos,keys,fdm,light,hull}=e.data;if(hull){try{postMessage(
           const es = plan.E.map((e, i) => [e, i]).filter(([e]) => e.g === gi);
           if (!es.length) return;
           rows.push(`<div class="sp-g">${gi>=0?`<input class="sp-gn" data-gn="${gi}" value="${J(plan.groups[gi].name)}" aria-label="Название изделия">`:`<b>${title}</b>`}</div>`);
-          for (const [e, i] of es) rows.push(`<div class="sp-e"><img class="sp-pic" alt="" src="${loThumb(P, e.shells, loRef(e))}"><input data-en="${i}" value="${J(e.name)}" aria-label="Название детали"><small>${loDimTxt(e.shells)}<br>${S(vol(e),1)} см³${e.shells.length>1?` · ${e.shells.length} ${loPl(e.shells.length,"тело","тела","тел")}`:""}</small><select data-eg="${i}" aria-label="Изделие">${gOpt(e.g)}</select>${e.g>=0&&!e.main?`<select data-ep="${i}" aria-label="Как печатать"><option value="sep"${e.print==="sep"?" selected":""}>печатать отдельно</option><option value="in"${e.print==="in"?" selected":""}>вместе с корпусом</option></select>`:`<span class="sp-ph">${e.g>=0?"основа":""}</span>`}</div>`)
+          for (const [e, i] of es) rows.push(`<div class="sp-e"><img class="sp-pic" alt="" src="${loThumb(P, e.shells, loRef(e))}"><input data-en="${i}" value="${J(e.name)}" aria-label="Название детали"><small>${e.count>1?`<b class="sp-cnt">× ${S(e.count)} шт</b> · `:""}${loDimTxt(e.shells)}<br>${S(vol(e),1)} см³${e.count>1?" за 1 шт":""}${e.shells.length>1?` · ${e.shells.length} ${loPl(e.shells.length,"тело","тела","тел")}`:""}</small><select data-eg="${i}" aria-label="Изделие">${gOpt(e.g)}</select>${e.g>=0&&!e.main?`<select data-ep="${i}" aria-label="Как печатать"><option value="sep"${e.print==="sep"?" selected":""}>печатать отдельно</option><option value="in"${e.print==="in"?" selected":""}>вместе с корпусом</option></select>`:`<span class="sp-ph">${e.g>=0?"основа":""}</span>`}</div>`)
         };
         plan.groups.forEach((g, i) => block(i)), block(-1, "Отдельные детали");
         f("dlgBody").innerHTML = `<p class="sub">В файле ${S(sh.length)} ${loPl(sh.length,"отдельное тело","отдельных тела","отдельных тел")}. Мелкие части привязаны к ближайшей крупной — это изделие. Буквы одного изделия собраны в «Надпись». Проверьте и поправьте: название, к какому изделию относится, как печатать.</p><div class="sp-list">${rows.join("")}</div><p class="sub">«Вместе с корпусом» — деталь печатается в одном задании с корпусом (например, другим цветом): её пластик и время войдут в цену корпуса. «Отдельно» — своя строка в заказе, её можно положить на стол отдельно и выбрать ей материал.</p>`
@@ -6802,8 +6816,8 @@ onmessage=e=>{const{id,pos,keys,fdm,light,hull}=e.data;if(hull){try{postMessage(
         let m = es.find(e => e.main) || es[0];
         const inn = es.filter(e => e !== m && e.print === "in"), sep = es.filter(e => e !== m && e.print !== "in"),
           gid = "g" + loPid(), gname = (g.name || "Изделие").trim(), solo = !sep.length;
-        todo.push({ name: solo ? gname : (m.name || "Корпус").trim(), shells: [...m.shells, ...inn.flatMap(e => e.shells)], incl: inn.map(e => e.name.trim()), grp: solo ? null : gid, gname, main: !0 });
-        for (const e of sep) todo.push({ name: e.name.trim(), shells: e.shells, grp: gid, gname })
+        todo.push({ name: solo ? gname : (m.name || "Корпус").trim(), shells: [...m.shells, ...inn.flatMap(e => e.all || e.shells)], incl: inn.map(e => e.name.trim()), grp: solo ? null : gid, gname, main: !0 });
+        for (const e of sep) todo.push({ name: e.name.trim(), shells: e.shells, grp: gid, gname, per: e.count || 1 })
       });
       const alone = plan.E.filter(e => e.g < 0), seen = new Map;
       for (const e of alone) {
@@ -6811,10 +6825,10 @@ onmessage=e=>{const{id,pos,keys,fdm,light,hull}=e.data;if(hull){try{postMessage(
           key = d ? [Math.round(d.vol / 100), ...d.dim.map(x => Math.round(x * 2)).sort((a, b) => a - b)].join("|") : null,
           tw = key && seen.get(key);
         if (tw) {
-          tw.qty++;
+          tw.qty += e.count || 1;
           continue
         }
-        const x = { name: e.name.trim(), shells: e.shells, qty: 1, base: e.base, auto: e.base && e.name.trim().replace(/ \d+$/, "") === e.base };
+        const x = { name: e.name.trim(), shells: e.shells, qty: e.count || 1, base: e.base, auto: e.base && e.name.trim().replace(/ \d+$/, "") === e.base };
         key && seen.set(key, x), todo.push(x)
       }
       {
@@ -6826,7 +6840,7 @@ onmessage=e=>{const{id,pos,keys,fdm,light,hull}=e.data;if(hull){try{postMessage(
           it(!0, `Считаю детали: ${i + 1} из ${todo.length} — ${x.gname ? x.gname + " · " : ""}${x.name}`), await kt(), await loAddGeom(loSplitPos(P, x.shells), x.name);
           const b = l.basket.find(q => q.id === loCur);
           if (!b) continue;
-          x.grp && (b.grp = x.grp, b.gname = x.gname, b.gq = 1, b.per = 1), x.incl && x.incl.length && (b.incl = x.incl), x.qty > 1 && (l.part.qty = x.qty, ft()), x.main || (await Os()), loSyncCur(), at()
+          x.grp && (b.grp = x.grp, b.gname = x.gname, b.gq = 1, b.per = x.per || 1, x.per > 1 && (l.part.qty = x.per, ft())), x.incl && x.incl.length && (b.incl = x.incl), x.qty > 1 && (l.part.qty = x.qty, ft()), x.main || (await Os()), loSyncCur(), at()
         }
         src && l.basket.some(b => b.id === src) && loDel(src)
       } finally {
