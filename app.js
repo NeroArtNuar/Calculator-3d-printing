@@ -3893,7 +3893,8 @@ window.__SMETA_SITE__ = 1;
         }
         if (mp && s && s.length >= 9) {
           for (const [q, pp] of mp.entries()) await loAddGeom(s.slice(pp.a, pp.b), pp.name || o + " · " + (q + 1));
-          V(`${n.name}: ${mp.length} объектов — отдельными деталями заказа`);
+          const mg = loMergeDup();
+          V(`${n.name}: ${mp.length} объектов — отдельными деталями заказа${mg ? `, одинаковые объединены (${S(mp.length - mg)} позиций)` : ""}`);
           continue
         }
         if (!s || s.length < 9) {
@@ -3925,7 +3926,10 @@ window.__SMETA_SITE__ = 1;
         console.error(s), it(!1), V(`${n.name}: не удалось прочитать файл (${s.message||s})`)
       }
     }
-    e && V("Детали добавлены в список заказа с текущими настройками.")
+    if (e) {
+      const mg = loMergeDup();
+      V("Детали добавлены в список заказа с текущими настройками." + (mg ? ` Одинаковые детали объединены: +${S(mg)} шт к тиражу` : ""))
+    }
   }
   async function ao(t, e) {
     it(!0, `Читаю ${t.name}…`);
@@ -6055,6 +6059,11 @@ window.__SMETA_SITE__ = 1;
         Zt.noAuto = !1
       }
     }
+    /* после «Очистить» окно остаётся пустым и после перезагрузки страницы */
+    if (nt.get("lo.empty", 0)) {
+      H = null, ge(), loSafe(Me), f("pillName") && (f("pillName").textContent = "Нет модели");
+      return
+    }
     await Fs("case", !0)
   }
   let loWk = null,
@@ -6131,6 +6140,7 @@ onmessage=e=>{const{id,pos,keys,fdm,light,hull}=e.data;if(hull){try{postMessage(
     return r.st
   }
   async function Zt(t, e) {
+    nt.get("lo.empty", 0) && nt.del("lo.empty");
     l.part.ppGc && (l.part.perPlate = 0, l.part.ppGc = 0);
     je(!0), it(!0), await kt(), tn(t);
     const n = await loVn(t);
@@ -6340,6 +6350,102 @@ onmessage=e=>{const{id,pos,keys,fdm,light,hull}=e.data;if(hull){try{postMessage(
     if (!Number.isFinite(v)) return String(x ?? "");
     const r = Math.round(v * 100) / 100;
     return S(r, Math.abs(r - Math.round(r)) < .005 ? 0 : 2)
+  }
+
+  /* полная очистка: список заказа, стол, сохранённые модели, окно просмотра пустое */
+  async function loClearAll() {
+    loFace && loFaceStop(), l.basket = [], loCur = null, loAllView = !1, loGeo.forEach(g => (g.geom && g.geom.dispose(), g.px && g.px.dispose())), loGeo.clear(), delete loSoloG.px, loGrp && loGrp.clear(), loBeds && loBeds.clear(), loDk = "", clearTimeout(loSt);
+    try {
+      await loDB.del()
+    } catch (e) {}
+    nt.del("lo.parts"), nt.set("lo.empty", 1), l.part.qty = 1, l.part.name = "", l.part.perPlate = 0, loGc = null;
+    const q = f("qtyInp");
+    q && (q.value = 1), H = null, ge(), loSafe(Me), f("pillName") && (f("pillName").textContent = "Нет модели"), loBed(""), He.position.set(0, 0, 0), loCam.tx = loCam.tz = loCam.r = 0, pt.tx = pt.tz = 0, Sn(), loSafe(at), zt = !0
+  }
+
+  /* «Для всех…»: технология и материал сразу у всех деталей заказа (по одной по-прежнему можно в строке) */
+  function loBulkOpen() {
+    const items = l.basket || [];
+    if (!items.length) return V("Список заказа пуст");
+    loCur && loStoreCur();
+    const techs = ee.filter(x => Qe(yn(x)).length && Qe(gn(x)).length),
+      tOpt = techs.map(x => `<option value="${x}"${x===l.tech?" selected":""}>${J(Nt[x].name)}</option>`).join(""),
+      mOpt = x => `<option value="">— оставить как есть —</option>` + Qe(gn(x)).map(m => `<option value="${J(m.id)}">${J(m.name)}</option>`).join(""),
+      grp = [...new Map(items.filter(b => b.grp).map(b => [b.grp, b.gname || "Изделие"])).entries()];
+    xe("Для всех деталей заказа", `<p class="sub">Выберите технологию и материал — они применятся ко всем деталям списка (${S(items.length)} ${loPl(items.length,"позиция","позиции","позиций")}). Каждую деталь по-прежнему можно поменять в её строке.</p>
+      <div class="grid u-cols2">
+        <label class="field"><span class="lbl">Технология</span><span class="inp"><select id="bkTech">${tOpt}</select></span></label>
+        <label class="field"><span class="lbl">Материал</span><span class="inp"><select id="bkMat">${mOpt(l.tech)}</select></span></label>
+        ${grp.length?`<label class="field" style="grid-column:1/-1"><span class="lbl">Какие детали</span><span class="inp"><select id="bkScope"><option value="">Все детали заказа</option>${grp.map(([g,n])=>`<option value="${J(g)}">Только «${J(n)}»</option>`).join("")}</select></span></label>`:""}
+      </div>`, `<button class="btn ghost" type="button" id="bkNo">Отмена</button><button class="btn" type="button" id="bkOk">Применить</button>`);
+    f("bkTech").onchange = () => {
+      const x = f("bkTech").value;
+      f("bkMat").innerHTML = mOpt(x), x !== l.tech && Qe(gn(x))[0] && (f("bkMat").value = Qe(gn(x))[0].id)
+    }, f("bkNo").onclick = Mt, f("bkOk").onclick = async () => {
+      const tech = f("bkTech").value, mat = f("bkMat").value, sc = f("bkScope") ? f("bkScope").value : "";
+      Mt(), await loBulkApply(tech, mat, sc)
+    }
+  }
+
+  async function loBulkApply(tech, mat, scope) {
+    const back = loCur, list = l.basket.filter(b => !scope || b.grp === scope);
+    let done = 0, skip = 0;
+    try {
+      for (const [k, b] of list.entries()) {
+        it(!0, `Меняю: ${k + 1} из ${list.length} — ${b.name}`), await kt();
+        if (!loGeo.has(b.id)) {
+          /* позиция без модели (из G-code/вручную): технологию не пересчитать, материал — по плотности */
+          if (tech === b.tech && mat) {
+            const m0 = l.materials.find(d => d.id === b.materialId), m1 = l.materials.find(d => d.id === mat);
+            m1 && (b.tech !== "sla" && !tt.has(b.tech) && m0 && m0.density > 0 && (b.grams = b.grams * m1.density / m0.density), b.materialId = m1.id, delete b.chamber, done++)
+          } else skip++;
+          continue
+        }
+        b.id !== loCur && (loStoreCur(), loLoad(b.id)), tech !== l.tech && Ve(tech, !0), mat && l.sel[l.tech] && (l.sel[l.tech].material = mat), Ne(), at(), loStoreCur(), done++
+      }
+    } finally {
+      it(!1)
+    }
+    back && back !== loCur && loGeo.has(back) && (loStoreCur(), loLoad(back)), at(), loSaveM(), V(`Готово: изменено ${S(done)} ${loPl(done,"позиция","позиции","позиций")}${skip?` · ${S(skip)} без модели — технологию у них не сменить`:""}`)
+  }
+
+  /* одинаковые детали в проекте — одна строка с тиражом, а не куча одинаковых строк */
+  function loFp(pos) {
+    const n = pos.length / 9;
+    let v = 0, x0 = 1 / 0, y0 = 1 / 0, z0 = 1 / 0, x1 = -1 / 0, y1 = -1 / 0, z1 = -1 / 0;
+    for (let i = 0; i < pos.length; i += 9) {
+      const a = pos[i], b = pos[i + 1], c = pos[i + 2], d = pos[i + 3], e = pos[i + 4], g = pos[i + 5], h = pos[i + 6], k = pos[i + 7], m = pos[i + 8];
+      v += a * (e * m - g * k) - b * (d * m - g * h) + c * (d * k - e * h)
+    }
+    for (let i = 0; i < pos.length; i += 3) {
+      const a = pos[i], b = pos[i + 1], c = pos[i + 2];
+      a < x0 && (x0 = a), a > x1 && (x1 = a), b < y0 && (y0 = b), b > y1 && (y1 = b), c < z0 && (z0 = c), c > z1 && (z1 = c)
+    }
+    return { n, v: Math.abs(v / 6), d: [x1 - x0, y1 - y0, z1 - z0].sort((p, q) => p - q) }
+  }
+
+  function loMergeDup() {
+    loCur && loStoreCur();
+    const seen = [], drop = [];
+    let merged = 0;
+    for (const b of l.basket) {
+      const g = loGeo.get(b.id);
+      if (!g || !g.H || !g.H.pos || b.grp) continue;
+      const fp = loFp(g.H.pos), ss = g.s ? JSON.stringify([g.s.slicer, g.s.sla, g.s.sls, g.s.sel, g.s.source]) : "", tw = seen.find(s => s.ss === ss && s.b.tech === b.tech && s.b.materialId === b.materialId && Math.abs(s.fp.n - fp.n) <= Math.max(2, fp.n * .002) && Math.abs(s.fp.v - fp.v) <= Math.max(1, fp.v * .005) && s.fp.d.every((x, i) => Math.abs(x - fp.d[i]) <= Math.max(.2, x * .005)));
+      if (!tw) {
+        seen.push({ b, fp, ss });
+        continue
+      }
+      const add = Math.max(1, Math.round(+b.qty || 1));
+      tw.b.id === loCur ? (l.part.qty = Math.max(1, Math.round(+l.part.qty || 1)) + add, ft()) : tw.b.qty = Math.max(1, Math.round(+tw.b.qty || 1)) + add, drop.push(b.id), merged += add
+    }
+    if (!drop.length) return 0;
+    for (const id of drop) {
+      const g = loGeo.get(id);
+      g && (g.geom && g.geom.dispose(), g.px && g.px.dispose()), loGeo.delete(id)
+    }
+    l.basket = l.basket.filter(b => !drop.includes(b.id)), loCur && !l.basket.some(b => b.id === loCur) && l.basket[0] && loGeo.has(l.basket[0].id) && loLoad(l.basket[0].id), loSyncCur(), at(), loSaveM();
+    return merged
   }
 
   function loTbL(b, s) {
@@ -6783,6 +6889,7 @@ onmessage=e=>{const{id,pos,keys,fdm,light,hull}=e.data;if(hull){try{postMessage(
         e: i
       }), await kt(), k++
     }
+    if (!H || H !== H1) return it(!1);
     Le(H.pos, s.e), it(!1), await Wt(), t || V(`Положение для ${Nt[l.tech].name}: ${zs(H.st,a,o).label}`)
   }
   const ve = t => Math.max(0, t.openEdges) + Math.max(0, t.badDir);
@@ -7087,7 +7194,7 @@ onmessage=e=>{const{id,pos,keys,fdm,light,hull}=e.data;if(hull){try{postMessage(
     if (!o.length) {
       f("sumTotal").textContent = "—", f("sumUnit").textContent = kn() && H ? (tt.has(l.tech) ? "Введите расход смолы и время из слайсера" : "Введите вес и время из слайсера") : "Загрузите модель или введите данные слайсера";
       for (const M of ["sumFacts", "sumRows", "sumTotals", "sumBar", "tiers", "sumAlerts"]) f(M).innerHTML = "";
-      f("mbTotal").textContent = "—", f("mbUnit").textContent = "", rn = null, Ys();
+      f("mbTotal").textContent = "—", f("mbUnit").textContent = "", rn = null, Ys(), !n && f("basket") && (f("basket").innerHTML = "");
       return
     }
     const s = en(o, t);
@@ -7421,7 +7528,7 @@ onmessage=e=>{const{id,pos,keys,fdm,light,hull}=e.data;if(hull){try{postMessage(
         k1 = (1 + (dt.adjust || 0) / 100) * (1 + s.rush) * (1 - s.optEff) * s.kCl,
         su = (dt.setupH || 0) * (+m.rate || 0) * (1 + s.prepMk / 100) * k1,
         sx = ((dt.cad || 0) + (dt.pack || 0) * (1 + (+m.markup || 0) / 100)) * k1,
-        M = sw > 0 ? (nm - su - sx) / sw : 0;
+        M = sw > 0 ? (nm - sx) / sw : 0; /* подготовка заказа разложена по позициям КП, отдельной строки нет */
       const sg = new Set;
       loOrd(s.lines).forEach(({
         it: E,
@@ -7434,7 +7541,7 @@ onmessage=e=>{const{id,pos,keys,fdm,light,hull}=e.data;if(hull){try{postMessage(
         }
         rows.push([E.name, `${Nt[k.tech].name} · ${k.mt.name}${E.color?" · "+E.color.toLowerCase():""}${E.incl&&E.incl.length?" · в составе: "+E.incl.join(", "):""}`, k.qty, W(k) * M, E.grp ? 1 : 0, loGeo.has(E.id) ? loRowThumb(E.id) : ""])
       });
-      su > .5 && rows.push(["Подготовка заказа", "приём и подготовка файлов", 0, su]), sx > .5 && rows.push(["Моделирование и упаковка", "на весь заказ", 0, sx]), s.minApplied && rows.push(["До минимальной суммы заказа", "", 0, s.client - nm])
+      sx > .5 && rows.push(["Моделирование и упаковка", "на весь заказ", 0, sx]), s.minApplied && rows.push(["До минимальной суммы заказа", "", 0, s.client - nm])
     } else {
       const a = Aa,
         k = s.lines[0].c;
@@ -11178,8 +11285,15 @@ uniform float uLayerH;`).replace("#include <color_fragment>", `#include <color_f
       /* клик по фону окно не закрывает — только крестик, «Отмена», «Сохранить» или Esc */
     }), document.addEventListener("keydown", i => {
       i.key === "Escape" && !f("dlg").hidden && Mt()
-    }), f("btnAddBasket").onclick = () => ki(!1), f("btnClearBasket").onclick = () => {
-      l.basket = [], loCur = null, loGeo.forEach(g => (g.geom && g.geom.dispose(), g.px && g.px.dispose())), loGeo.clear(), at(), typeof loSaveM == "function" && loSaveM(), V("Список заказа очищен — считаем одну деталь")
+    }), f("btnAddBasket").onclick = () => ki(!1), f("btnBulk") && (f("btnBulk").onclick = loBulkOpen), f("btnClearBasket").onclick = async () => {
+      const i = f("btnClearBasket");
+      if (!i.dataset.sure) {
+        i.dataset.sure = 1, i.dataset.t0 = i.textContent, i.textContent = "Точно очистить?", V("Нажмите ещё раз — список заказа и окно просмотра очистятся"), setTimeout(() => {
+          i.dataset.sure && (delete i.dataset.sure, i.textContent = i.dataset.t0 || "Очистить список")
+        }, 3500);
+        return
+      }
+      delete i.dataset.sure, i.textContent = i.dataset.t0 || "Очистить список", await loClearAll(), V("Список заказа и стол очищены. Загрузите модель или перетащите файл")
     }, loKp(), f("leadBtns").addEventListener("click", i => {
       const r = i.target.closest("[data-lead]");
       r && loLeadGo(r.dataset.lead)
@@ -11276,16 +11390,7 @@ uniform float uLayerH;`).replace("#include <color_fragment>", `#include <color_f
         }, 3500);
         return
       }
-      delete i.dataset.sure, i.classList.remove("sure"), loTbL(i, "Очистить стол");
-      l.basket = [], loCur = null, loAllView = !1, loGeo.forEach(g => (g.geom && g.geom.dispose(), g.px && g.px.dispose())), loGeo.clear(), delete loSoloG.px, loGrp && loGrp.clear(), loDk = "", clearTimeout(loSt), await loDB.del(), nt.del("lo.parts"), l.part.qty = 1;
-      const q = f("qtyInp");
-      q && (q.value = 1);
-      try {
-        await Fs("case", !0)
-      } catch (e) {
-        console.error(e)
-      }
-      at(), V("Стол очищен. Загрузите свою модель или перетащите файл")
+      delete i.dataset.sure, i.classList.remove("sure"), loTbL(i, "Очистить стол"), await loClearAll(), V("Стол очищен. Загрузите модель или перетащите файл в окно просмотра")
     }, f("btnReset").onclick = () => {
       const i = f("btnReset");
       if (!i.dataset.sure) {

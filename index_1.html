@@ -1,0 +1,446 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="Калькулятор стоимости 3D-печати FDM и фотополимер SLA/DLP/LCD: нарезка модели в браузере, поддержки, G-code из OrcaSlicer, сроки, текст КП.">
+<meta name="copyright" content="© 2026 Смета 3D">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<title>Смета 3D-печати</title>
+<script>try{var t=localStorage.getItem("fdmcalc.theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Unbounded:wght@600&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" integrity="sha512-dLxUelApnYxpLt6K2iomGngnHO83iUvZytA3YjDUCjT0HDOHKXnVYdf3hU4JjM8uEhxf9nD1/ey98U3t2vZ0qQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" integrity="sha512-XMVd28F1oH/O71fzwBnV7HucLxVwtxf26XV8P4wPk26EDxuGZ91N8bsOttmnomcCD3CS5ZMRL50H0GgOHvegtg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script>/* CDN недоступен или файл подменён — берём копии из репозитория */window.THREE||document.write('<script src="vendor/three-r128.min.js"><\/script>');window.JSZip||document.write('<script src="vendor/jszip-3.10.1.min.js"><\/script>');</script>
+<link rel="stylesheet" href="styles.css?v=6b75b014">
+</head>
+<body>
+<div class="as-bar" id="asBar" hidden><span id="asBarT"></span> · <button class="as-bar-x" type="button" id="asBarX">Выйти из просмотра</button></div>
+
+
+<header class="top">
+  <div class="top-in">
+    <div class="brand">
+      <img id="brandLogo" class="brand-logo" alt="" hidden><svg class="brand-ico" width="28" height="28" viewBox="0 0 34 34" aria-hidden="true"><defs><linearGradient id="palGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="hsl(150 58% 36%)"/><stop offset="1" stop-color="hsl(280 50% 48%)"/></linearGradient></defs><rect x="1" y="1" width="32" height="32" rx="8" fill="var(--accent)"/><path d="M11 8h12v6l-3 4h-6l-3-4z" fill="var(--on-accent)"/><path d="M15.5 18h3l-1.5 3z" fill="var(--on-accent)"/><path d="M7 26h20M9 23h16" stroke="var(--on-accent)" stroke-width="2" stroke-linecap="round" opacity=".75"/></svg>
+      <h1>Смета 3D-печати</h1>
+    </div>
+    <div class="tech" id="techSeg" hidden><button type="button" data-tech="fdm">FDM</button></div>
+    <div class="seg tech2" id="techMain" role="group" aria-label="Технология"><button type="button" data-main="fdm" title="Печать пластиковой нитью">FDM</button><button type="button" data-main="resin" title="Фотополимер: SLA (лазер), DLP (проектор) или LCD (экран)">Фотополимер</button><button type="button" data-main="sls" title="Спекание порошка: нейлон PA12, PA11, TPU">SLS</button></div>
+    <a class="site-link" href="plugin.html">Плагин для OrcaSlicer</a>
+    <div class="seg" id="viewSeg" role="tablist" aria-label="Раздел"><button type="button" role="tab" data-view="print" class="on">Печать</button><button type="button" role="tab" data-view="cad">Моделирование</button></div>
+    <div class="seg" id="modeSeg" role="group" aria-label="Режим калькулятора">
+      <button type="button" data-mode="simple" title="Только то, что нужно для цены">Простой</button>
+      <button type="button" data-mode="adv" title="Параметры печати, ставки, состав себестоимости">Расширенный</button>
+      <button type="button" data-mode="staff" hidden title="Себестоимость, наценка в пределах допуска, КП, список заказа">Сотрудник</button><button type="button" data-mode="pro" hidden title="Всё: ставки, профили, налоги, пароли">Бизнес</button>
+    </div>
+    <button class="btn small pro" type="button" id="btnWs" title="Цены, видимость полей, сверка, принтеры и материалы">Настройки мастерской</button>
+    <button class="btn small btn-warn" type="button" id="unpubBadge" hidden></button>
+    <button class="btn small ghost" type="button" id="btnLogout" hidden title="Выйти из режима мастерской"></button>
+    <button class="icon-btn pro" id="btnSettings" type="button" title="Перенос профилей: сохранить или загрузить принтеры, материалы и ставки" aria-label="Перенос профилей">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path stroke-linecap="round" d="M2 4h7M12 4h2M2 8h2M7 8h7M2 12h8M13 12h1"/><circle cx="10.5" cy="4" r="1.5"/><circle cx="5.5" cy="8" r="1.5"/><circle cx="11.5" cy="12" r="1.5"/></svg>
+    </button>
+    <button class="icon-btn" id="btnTheme" type="button" title="Тема: светлая или тёмная" aria-label="Тема: светлая или тёмная"></button>
+    <button class="icon-btn mgr" id="btnReset" type="button" title="Сбросить настройки (профили принтеров и материалов сохранятся)" aria-label="Сбросить настройки">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M2.5 8a5.5 5.5 0 1 0 1.7-4"/><path d="M2.5 2.5v3h3"/></svg>
+    </button>
+  </div>
+</header>
+
+<main class="layout">
+<div class="col-main">
+  <div class="strip pro" id="strip"><span class="lbl">В расчёте:</span></div>
+  <nav class="steps" id="stepNav" role="tablist" aria-label="Разделы расчёта"><button type="button" role="tab" data-step="1"><b>1</b><span>Расчёт</span><small id="stS1"></small></button><button type="button" role="tab" data-step="2"><b>2</b><span>Итог</span><small id="stS2"></small></button><label class="check st-more" hidden><input type="checkbox" id="moreChk">Подробнее</label></nav>
+
+  <section class="card" id="secCad">
+    <div class="card-h"><h2>Моделирование</h2><span class="cap">оценка по фото, эскизу или чертежу</span></div>
+    <div class="card-b cad-wrap">
+      <div class="cad-in">
+        <div class="cad-row"><span class="cad-l">Есть</span><div class="seg wrap"><button type="button" data-ct="foto" title="фото или видео готовой детали">Фото</button><button type="button" data-ct="draw" title="есть размеры на бумаге или в PDF">Эскиз или чертёж</button><button type="button" data-ct="mod" title="есть STL/STEP, нужно изменить">Модель на доработку</button><button type="button" data-ct="scan" title="есть скан, нужна чистая модель">3D-скан</button></div></div>
+        <div class="cad-row"><span class="cad-l">Форма</span><div class="seg wrap"><button type="button" data-csh="plate" title="пластина, кронштейн, уголок">Плоская</button><button type="button" data-csh="box" title="стенки, крышка, внутренние полости">Корпус</button><button type="button" data-csh="rev" title="втулка, ручка, колпачок, шкив">Тело вращения</button><button type="button" data-csh="org" title="фигурка, рельеф, сложные изгибы">Органика</button></div></div>
+        <div class="cad-row"><span class="cad-l">Размер</span><div class="seg wrap"><button type="button" data-csz="s" title="до 10 см">В ладонь</button><button type="button" data-csz="m" title="до 20 см">До 20 см</button><button type="button" data-csz="l" title="больше 20 см">Больше</button></div></div>
+        <div class="cad-row"><span class="cad-l">Элементы</span><div class="cad-chips" id="cadFeats"></div></div>
+        <div class="cad-row"><span class="cad-l"></span><label class="check"><input type="checkbox" id="cadAcc">Точно по размерам</label><label class="check"><input type="checkbox" id="cadNoDims">Размеров нет</label><label class="check"><input type="checkbox" id="cadRush">Срочно</label><span class="inp u-w96"><input type="number" id="cadN" min="1" max="50" step="1" inputmode="numeric" aria-label="Сколько разных деталей"><em>дет.</em></span></div>
+        <div class="cad-row"><span class="cad-l"></span><input type="file" id="cadFiles" accept="image/*,.pdf" multiple hidden><button class="btn small" type="button" id="cadPick">+ Фото или эскиз</button><div class="cad-thumbs" id="cadThumbs"></div></div>
+        <textarea class="u-wide" id="cadNote" rows="2" placeholder="Комментарий: размеры, для чего деталь" aria-label="Комментарий"></textarea>
+      </div>
+      <div class="cad-out"><div id="cadRes"></div><div class="cad-btns" id="cadSendBtns"></div><small class="cap">Фото остаются у вас — приложите их к сообщению.</small></div>
+    </div>
+  </section>
+  <section class="card" id="secModel">
+    <div class="card-h">
+      <h2><span class="t-s">Модель</span><span class="t-f">Модель</span></h2>
+      <div class="u-row u-ac">
+        <span class="inp u-h32"><select id="demoSelect" aria-label="Пример модели">
+          <option value="">Пример…</option><option value="case">Стакан-корпус</option><option value="bracket">L-кронштейн</option><option value="arch">Арка</option><option value="knot">Узел</option>
+        </select></span>
+        <label class="btn primary file-btn">Загрузить<input type="file" id="fileInput" multiple accept=".stl,.obj,.3mf,.step,.stp,.igs,.iges,.gcode,.gco,.bgcode"></label>
+      </div>
+    </div>
+    <div class="card-b">
+      <div class="model-grid">
+        <div class="viewer-wrap" id="viewerWrap">
+          <div id="viewer"></div>
+          <div class="ov tl"><span class="pill" id="pillName">—</span><span class="pill" id="loBed" hidden></span></div>
+          <div class="ov bl">
+            <div class="toolbar tb-main">
+              <div class="tb-dd"><button type="button" class="tb" id="btnLay" aria-haspopup="menu" aria-expanded="false" title="Как положить модель на стол"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 20h18"/><rect x="6" y="11" width="12" height="7" rx="1.5"/><path d="M12 3v5M9.5 5.5 12 8l2.5-2.5"/></svg><span class="tb-l">Положить</span><span class="tb-car" aria-hidden="true">▾</span></button>
+                <div class="tb-menu" id="layMenu" role="menu" hidden>
+                  <button type="button" role="menuitem" class="mi adv" id="btnFace" title="Нажмите, потом выберите на модели грань — модель ляжет ею на стол (клавиша F)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 20h18"/><path d="M6 17 12 7l6 10z"/><path d="M6 17h12" stroke-width="3"/></svg><span><b>Гранью на стол</b><small>выберите грань мышкой · клавиша F</small></span></button>
+                  <button type="button" role="menuitem" class="mi" id="btnOrient" title="Выбрать самое выгодное положение для текущей технологии"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.9 4.6L18.5 9.5l-4.6 1.9L12 16l-1.9-4.6L5.5 9.5l4.6-1.9z"/><path d="M19 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/></svg><span><b>Подобрать лучшее</b><small>само выберет выгодное положение</small></span></button>
+                  <button type="button" role="menuitem" class="mi adv" id="btnFlat" title="Положить на самую большую плоскую грань"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 20h18"/><rect x="5" y="12" width="14" height="6" rx="1"/></svg><span><b>На самую большую грань</b><small>быстро, без перебора</small></span></button>
+                  <button type="button" role="menuitem" class="mi adv" id="btnPos" title="Повороты на любой угол и подбор положения по цели"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 4v5h-5"/></svg><span><b>Повернуть точно…</b><small>углы по осям и цель подбора</small></span></button>
+                </div>
+              </div>
+              <button type="button" class="tb" id="btnScale" title="Изменить масштаб модели" aria-label="Масштаб"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 14v6h6"/><path d="M20 10V4h-6"/><path d="M4 20 20 4"/></svg><span class="tb-l">Масштаб</span></button>
+              <button type="button" class="tb adv" id="btnSplit" title="Сборка из нескольких тел: разделить на изделия и детали для заказа" aria-label="Разбить"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/><path d="M14 4h6v6M4 14v6h6" stroke-dasharray="2 2.2"/></svg><span class="tb-l">Разбить</span></button>
+              <button type="button" class="tb" id="btnRepair" title="Закрыть дыры, развернуть нормали, убрать лишние грани" aria-label="Починить"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3.5 17.5l3 3 5.8-5.8a4 4 0 0 0 5.4-5.4l-2.4 2.4-2.6-.5-.5-2.6z"/></svg><span class="tb-l">Починить</span></button>
+              <button type="button" class="tb adv" id="btnSup" title="Поддержки, плот и острова" aria-label="Поддержки" data-tech="fdm sla dlp lcd"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16M4 20h16"/><path d="M7.5 5v15M12 5v15M16.5 5v15" stroke-dasharray="2.5 1.6"/></svg><span class="tb-l">Поддержки</span></button>
+            </div>
+            <div class="toolbar tb-view"><button type="button" class="tb on" id="btnOver" title="Подсветить нависания круче 45°" aria-label="Нависания" data-tech="fdm sla dlp lcd"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V9h16"/><path d="M8 9l3 4M12 9l3 4M16 9l3 4"/></svg><span class="tb-l">Нависания</span></button><button type="button" class="tb tb-ico" id="btnCam" title="Вернуть камеру. Вращать — левой кнопкой, сдвигать — правой (или Shift + левой), приближать к курсору — колесом" aria-label="Камера"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1"/><path d="M3.5 4v5h5"/></svg><span class="tb-l">Камера</span></button><span class="tb-sep" aria-hidden="true"></span><button type="button" class="tb clear-bed tb-ico" id="btnClearBed" title="Убрать все модели со стола и из списка заказа" aria-label="Очистить стол"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6.5 7l1 13h9l1-13M10 11v5M14 11v5"/></svg><span class="tb-l">Очистить стол</span></button></div>
+          </div>
+          <div class="pop" id="scalePop" hidden>
+            <p class="pop-h">Масштаб <b id="scaleVal">100%</b></p>
+            <input type="range" id="scaleRange" min="10" max="400" step="1" aria-label="Масштаб, %">
+            <div class="pop-row"><span class="inp"><input type="number" id="scaleNum" min="1" max="10000" step="0.1" aria-label="Масштаб, %"><em>%</em></span>
+              <button type="button" data-scale="50">50</button><button type="button" data-scale="100">100</button><button type="button" data-scale="200">200</button></div>
+            <label class="check"><input type="checkbox" id="scaleLock" checked>Пропорционально</label>
+            <div class="pop-row axes"><span class="inp"><input type="number" id="sX" min="0.1" step="0.1" aria-label="Размер X"><em>X мм</em></span><span class="inp"><input type="number" id="sY" min="0.1" step="0.1" aria-label="Размер Y"><em>Y мм</em></span><span class="inp"><input type="number" id="sZ" min="0.1" step="0.1" aria-label="Размер Z"><em>Z мм</em></span></div>
+            <button type="button" class="pop-link" id="scaleFit">Вписать в стол принтера</button>
+            <small class="pop-info" id="scaleDims"></small>
+          </div>
+          <div class="layer-box" id="layerBox" hidden>
+            <span class="layer-val" id="layerVal"></span>
+            <input type="range" id="layerRange" min="1" max="100" step="1" aria-label="Просмотр по слоям">
+            <button type="button" class="layer-all" id="layerAll" hidden title="Показать всю модель">все</button>
+          </div>
+          <div class="layer-legend" id="layerLegend" hidden></div>
+          <div class="drop-hint" id="dropHint" hidden>Отпустите файлы</div>
+          <div class="busy" id="busy" hidden><span id="busyText">Считаю…</span></div>
+        </div>
+        <div class="u-col u-g10 u-min0">
+          <div class="facts" id="facts"></div>
+          <div class="part-chips" id="partChips" hidden></div>
+          <div id="basketBox" class="basket-side" hidden data-block="basket">
+            <div class="u-between u-mb6"><p class="sub">Детали заказа</p><span class="u-flex6"><button class="btn small" type="button" id="btnAddPart2">+ Деталь</button><button class="btn small ghost" type="button" id="btnBulk" title="Сменить технологию и материал сразу у всех деталей заказа">Для всех…</button><button class="btn small ghost danger" type="button" id="btnClearBasket" title="Удалить все позиции и очистить окно просмотра">Очистить список</button></span></div>
+            <div class="basket" id="basket"></div>
+          </div>
+          <button class="btn small u-start" type="button" id="btnAddPart" data-block="basket">+ Ещё деталь в заказ</button>
+          <div class="alert info" id="autoOrient" hidden><p id="autoOrientT"></p><button class="btn small" type="button" id="autoOrientUndo">Как в файле</button></div>
+          <div class="alerts" id="modelAlerts"></div>
+          <details class="dims-box adv" id="dimsBox" open><summary>Размеры, масштаб, единицы <small id="dimsSum"></small></summary>
+          <div class="grid u-cols2">
+            <label class="field"><span class="lbl">Единицы файла</span><span class="inp"><select id="unitSel"><option value="1">мм</option><option value="10">см</option><option value="25.4">дюймы</option><option value="1000">метры</option></select></span></label>
+            <label class="field"><span class="lbl">Масштаб</span><span class="inp"><input id="scalePct" type="number" min="1" max="10000" step="1" value="100"><em>%</em></span></label>
+            <label class="field"><span class="lbl">X</span><span class="inp"><input id="dimX" type="number" min="0.1" step="0.1"><em>мм</em></span></label>
+            <label class="field"><span class="lbl">Y</span><span class="inp"><input id="dimY" type="number" min="0.1" step="0.1"><em>мм</em></span></label>
+            <label class="field"><span class="lbl">Z</span><span class="inp"><input id="dimZ" type="number" min="0.1" step="0.1"><em>мм</em></span></label>
+            <label class="check u-end"><input type="checkbox" id="scaleLock2" checked>Пропорционально</label>
+          </div>
+          </details>
+        </div>
+      </div>
+      <div class="tool-panel" id="posPanel" hidden>
+        <div class="tp-h"><b>Положение модели</b><button type="button" class="tp-x" data-close="posPanel" aria-label="Закрыть">×</button></div>
+        <small class="cap" id="posInfo"></small>
+        <div class="tp-sec"><span class="tp-l">Подобрать автоматически</span><div class="goal-grid" id="posGoals"></div></div>
+        <div class="tp-sec"><span class="tp-l">Повернуть</span>
+          <div class="rot-row"><span class="rot-l">Шаг</span><span class="inp sm"><input id="posStep" type="number" min="1" max="180" step="1" value="15" aria-label="Шаг поворота"><em>°</em></span>
+            <button type="button" data-step="x:-1">X −</button><button type="button" data-step="x:1">X +</button><button type="button" data-step="y:-1">Y −</button><button type="button" data-step="y:1">Y +</button><button type="button" data-step="z:-1">Z −</button><button type="button" data-step="z:1">Z +</button></div>
+          <div class="rot-row"><span class="rot-l">Точно</span>
+            <span class="inp sm"><input id="posX" type="number" step="1" value="0" aria-label="Угол по X"><em>X°</em></span><span class="inp sm"><input id="posY" type="number" step="1" value="0" aria-label="Угол по Y"><em>Y°</em></span><span class="inp sm"><input id="posZ" type="number" step="1" value="0" aria-label="Угол по Z"><em>Z°</em></span>
+            <button type="button" id="posApply">Повернуть</button></div>
+          <div class="rot-row"><span class="rot-l">Быстро</span><button type="button" data-rot="x">90° X</button><button type="button" data-rot="y">90° Y</button><button type="button" data-rot="z">90° Z</button><button type="button" id="btnFlat2" hidden>На грань</button></div>
+        </div>
+      </div>
+      <div class="tool-panel" id="supPanel" hidden>
+        <div class="tp-h"><b>Поддержки</b><button type="button" class="tp-x" data-close="supPanel" aria-label="Закрыть">×</button></div>
+        <div class="tp-sec"><span class="tp-l">Построить</span>
+          <div class="goal-grid" id="supTypes"></div>
+          <div class="rot-row"><small class="pop-info" id="supInfo"></small><button type="button" class="pop-link" id="supClear">Убрать</button></div>
+        </div>
+        <div class="tp-sec" id="latSec"><span class="tp-l">Перекрытия</span><div class="seg" id="latSeg"></div><small class="cap" id="latNote"></small>
+          <label class="check"><input type="checkbox" id="stabChk" checked>Стабилизирующие опоры для тяжёлых и наклонённых деталей</label><small class="cap" id="stabNote"></small></div>
+        <div class="tp-sec"><span class="tp-l">Плот</span><div class="seg" id="raftSeg"></div><small class="cap" id="raftNote"></small></div>
+        <div class="tp-sec"><span class="tp-l">Острова</span><small class="cap" id="islInfo"></small>
+          <div class="rot-row"><button type="button" id="islFind">Проверить острова</button>
+            <span id="islFix" class="rot-row" hidden></span></div>
+        </div>
+        <details class="tp-sec adv"><summary class="tp-l">Параметры поддержек</summary>
+          <div class="seg" id="supEditSeg"></div>
+          <small class="cap" id="supEditNote"></small>
+          <div class="grid" id="supFields"></div>
+          <button type="button" class="pop-link" id="supReset">Сбросить параметры этого типа</button>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <section class="card" id="secPrint">
+    <div class="card-h">
+      <h2><span class="t-s">Технология и материал</span><span class="t-f">Печать</span></h2>
+      <div class="seg adv" id="srcSeg" data-tech="fdm sla dlp lcd">
+        <button type="button" data-src="model" class="on">Оценка по модели</button>
+        <button type="button" data-src="manual">Данные слайсера</button>
+        <button type="button" data-src="orca" class="desk-only" data-tech="fdm" title="Нарезать модель в установленном OrcaSlicer и взять точные вес и время">OrcaSlicer</button>
+      </div>
+    </div>
+    <div class="card-b">
+      <div class="techbig">
+        <div class="tb-grid" id="techSub" role="group" aria-label="Технология печати">
+          <button type="button" data-sub="fdm"><b><span class="t-s">Пластик</span><span class="t-f">FDM</span></b><small><span class="t-s">FDM · функциональные детали, корпуса, крупные изделия</span><span class="t-f">пластиковая нить · прочные детали, крупные корпуса, дешевле всего</span></small></button>
+          <button type="button" data-sub="sla"><b><span class="t-s">Фотополимер</span><span class="t-f">SLA</span></b><small><span class="t-s">SLA / DLP / LCD · высокая детализация, гладкая поверхность</span><span class="t-f">фотополимер, лазер · высокая точность, гладкая поверхность</span></small></button>
+          <button type="button" data-sub="dlp"><b>DLP</b><small>фотополимер, проектор · мелкие детальные изделия</small></button>
+          <button type="button" data-sub="lcd"><b>LCD</b><small>фотополимер, экран · быстро и недорого</small></button>
+          <button type="button" data-sub="sls"><b><span class="t-s">Нейлон</span><span class="t-f">SLS</span></b><small><span class="t-s">SLS · сложная геометрия без поддержек, высокая прочность</span><span class="t-f">порошок, лазер · прочный нейлон, без поддержек</span></small></button>
+        </div>
+        <small class="cap" id="techSubNote"></small>
+      </div>
+      <div class="row-sel">
+        <div class="field adv"><span class="lbl">Принтер</span><div class="sel-wrap"><span class="inp"><select id="printerSel" aria-label="Принтер"></select></span>
+          <button class="icon-btn adv" type="button" id="editPrinter" title="Изменить профиль принтера" aria-label="Изменить принтер">✎</button><button class="icon-btn adv" type="button" id="addPrinter" title="Добавить принтер" aria-label="Добавить принтер">+</button></div><small class="cap" id="printerAuto" hidden></small></div>
+        <div class="field"><span class="lbl">Материал</span><div class="sel-wrap"><span class="inp"><select id="matSel" aria-label="Материал"></select></span>
+          <button class="icon-btn adv" type="button" id="editMat" title="Изменить профиль материала" aria-label="Изменить материал">✎</button><button class="icon-btn adv" type="button" id="addMat" title="Добавить материал" aria-label="Добавить материал">+</button></div></div>
+      </div>
+      <div class="field clr-field"><span class="lbl">Цвет <b class="clr-nm" id="colorName"></b></span><div class="swatches" id="colorSw" role="radiogroup" aria-label="Цвет изделия"></div></div>
+
+      <p class="hint how" data-tech="fdm">Калькулятор сам нарезает модель по слоям — стенки, сплошные слои, заполнение, поддержки — и считает вес и время. OrcaSlicer для этого не нужен. Если модель уже нарезана, загрузите G-code: вес, время и детали стола возьмутся из него точно.</p>
+      <div class="u-col u-g12" id="srcModel">
+        <div class="presets" id="presets" data-tech="fdm sla dlp lcd"></div>
+        <div class="grid" data-tech="fdm">
+          <label class="field adv"><span class="lbl">Сопло</span><span class="inp"><select data-bind="slicer.nozzle" data-num><option value="0.2">0.2</option><option value="0.4">0.4</option><option value="0.6">0.6</option><option value="0.8">0.8</option></select><em>мм</em></span></label>
+          <label class="field adv"><span class="lbl">Слой</span><span class="inp"><select data-bind="slicer.layer" data-num id="layerSel"></select><em>мм</em></span></label>
+          <label class="field adv"><span class="lbl">Стенки</span><span class="inp"><input type="number" min="1" max="20" step="1" data-bind="slicer.walls"><em>шт</em></span></label>
+          <label class="field adv"><span class="lbl">Сверху / снизу</span><span class="inp"><input type="number" min="0" max="30" step="1" data-bind="slicer.top" aria-label="Слоёв сверху"><em>/</em><input type="number" min="0" max="30" step="1" data-bind="slicer.bottom" aria-label="Слоёв снизу"><em>сл.</em></span></label>
+          <label class="field adv"><span class="lbl">Заполнение</span><span class="inp"><input type="number" min="0" max="100" step="5" data-bind="slicer.infill"><em>%</em></span></label>
+          <label class="field adv"><span class="lbl">Поддержки</span><span class="inp"><select data-bind="slicer.supports"><option value="auto">Где нужны</option><option value="off">Без поддержек</option></select></span></label>
+          <label class="field adv"><span class="lbl">Тип поддержек</span><span class="inp"><select data-bind="slicer.supportType"><option value="tree">Древовидные</option><option value="normal">Обычные</option></select></span></label>
+          <label class="check adv" hidden><input type="checkbox" data-bind="slicer.brim">Кайма</label>
+          <div class="field adv chamber-f" data-block="energy"><span class="lbl">Термокамера</span><label class="check u-h32 u-start"><input type="checkbox" id="chamberChk">Греть камеру</label><small class="cap" id="chamberCap"></small></div>
+        </div>
+        <div class="grid" data-tech="sla dlp lcd">
+          <label class="field adv"><span class="lbl">Слой</span><span class="inp"><select data-bind="sla.layer" data-num><option value="0.025">0.025</option><option value="0.03">0.03</option><option value="0.05">0.05</option><option value="0.07">0.07</option><option value="0.1">0.10</option></select><em>мм</em></span></label>
+          <label class="field adv"><span class="lbl">Поддержки</span><span class="inp"><select data-bind="sla.supports"><option value="auto">На поддержках</option><option value="off">На платформе</option></select></span></label>
+          <label class="field adv"><span class="lbl">Плотность поддержек</span><span class="inp"><select data-bind="sla.density"><option value="light">Лёгкие</option><option value="medium">Средние</option><option value="heavy">Сложные</option></select></span></label>
+          <label class="field adv"><span class="lbl">Наклон</span><span class="inp"><input type="number" min="0" max="60" step="5" data-bind="sla.tilt"><em>°</em></span></label>
+          <label class="check adv"><input type="checkbox" data-bind="sla.hollow">Полая</label>
+          <label class="field pro"><span class="lbl">Стол</span><span class="inp"><select data-bind="sla.share"><option value="shared">Общий с другими заказами</option><option value="own">Только этот заказ</option></select></span></label>
+          <label class="field pro"><span class="lbl">Загрузка стола</span><span class="inp"><input type="number" min="10" max="100" step="5" data-bind="sla.fill"><em>%</em></span></label>
+          <label class="field adv"><span class="lbl">Стенка полой</span><span class="inp"><input type="number" min="0.8" max="10" step="0.1" data-bind="sla.wall"><em>мм</em></span></label>
+        </div>
+        <div class="grid" data-tech="sls">
+          <label class="field adv"><span class="lbl">Слой</span><span class="inp"><select data-bind="sls.layer" data-num><option value="0.075">0.075</option><option value="0.1">0.10</option><option value="0.11">0.11</option><option value="0.125">0.125</option><option value="0.15">0.15</option></select><em>мм</em></span></label>
+          <label class="field pro"><span class="lbl">Запуск</span><span class="inp"><select data-bind="sls.share"><option value="own">Только этот заказ</option><option value="batch">Общий с другими заказами</option></select></span></label><label class="field pro"><span class="lbl">Загрузка общего запуска</span><span class="inp"><input type="number" min="10" max="100" step="5" data-bind="sls.fill"><em>%</em></span></label>
+          <div class="field adv u-full"><span class="lbl">Из программы подготовки (Sinterit Studio, PreForm…) — необязательно</span><div class="grid"><label class="field"><span class="lbl">Масса 1 шт</span><span class="inp"><input type="number" min="0" step="0.1" data-bind="sls.mG" aria-label="Масса 1 шт из программы подготовки"><em>г</em></span></label><label class="field"><span class="lbl">Высота сборки</span><span class="inp"><input type="number" min="0" step="1" data-bind="sls.mH" aria-label="Высота сборки"><em>мм</em></span></label><label class="field"><span class="lbl">Время запуска (весь тираж)</span><span class="inp"><input type="number" min="0" step="0.1" data-bind="sls.mT" aria-label="Время запуска"><em>ч</em></span></label></div><small class="cap">Если заданы масса и время — расчёт по ним, без оценки по модели. Очистите поля, чтобы вернуть оценку.</small></div>
+          <label class="field adv"><span class="lbl" title="Какую долю камеры занимают детали. Обычно 8–15%, у опытных — до 20%">Упаковка камеры</span><span class="inp"><input id="packInp" type="number" min="0.1" max="40" step="0.1" data-bind="sls.packing"><em>%</em></span></label>
+        </div>
+        <div class="u-col" id="estBox"></div>
+      </div>
+      <div id="srcManual" hidden>
+        <div class="grid">
+          <label class="field"><span class="lbl" id="manAmtLbl">Пластик на 1 шт</span><span class="inp"><input id="manAmt" type="number" min="0" step="0.1"><em id="manAmtUnit">г</em></span></label>
+          <label class="field"><span class="lbl" id="manTimeLbl">Время 1 шт</span><span class="inp"><input id="manH" type="number" min="0" step="1" aria-label="Часы"><em>ч</em><input id="manM" type="number" min="0" max="59.99" step="any" aria-label="Минуты"><em>мин</em></span></label>
+        </div>
+        <p class="hint u-mt8" id="manualNote"></p>
+      </div>
+      <div class="u-col u-g12" id="srcOrca" hidden>
+        <div class="alerts" id="orcaStatus"></div>
+        <div class="grid wide" id="orcaSel">
+          <label class="field"><span class="lbl">Принтер в Orca</span><span class="inp"><select id="orcaMachine" aria-label="Принтер в Orca"></select></span></label>
+          <label class="field"><span class="lbl">Процесс</span><span class="inp"><select id="orcaProcess" aria-label="Процесс"></select></span></label>
+          <label class="field"><span class="lbl">Пластик</span><span class="inp"><select id="orcaFilament" aria-label="Пластик"></select></span></label>
+        </div>
+        <div class="grid" id="orcaOv">
+          <label class="field"><span class="lbl" title="Пусто — как в профиле">Заполнение</span><span class="inp"><input id="orcaInfill" type="number" min="0" max="100" step="5" placeholder="профиль"><em>%</em></span></label>
+          <label class="field"><span class="lbl" title="Пусто — как в профиле">Стенки</span><span class="inp"><input id="orcaWalls" type="number" min="1" max="20" step="1" placeholder="профиль"><em>шт</em></span></label>
+          <label class="field"><span class="lbl">Поддержки</span><span class="inp"><select id="orcaSupport"><option value="profile">Как в профиле</option><option value="on">Включить</option><option value="off">Выключить</option></select></span></label>
+        </div>
+        <div class="orca-row">
+          <button class="btn primary" type="button" id="btnSlice">Нарезать в OrcaSlicer</button>
+          <button class="btn" type="button" id="btnOrcaOpen" title="Открыть эту модель в окне OrcaSlicer">Открыть в Orca</button>
+          <label class="check u-hauto"><input type="checkbox" id="orcaAuto">Нарезать сразу после загрузки</label>
+        </div>
+        <div class="orca-res" id="orcaRes"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card" id="secOrder">
+    <div class="card-h"><h2><span class="t-s">Заказ</span><span class="t-f">Заказ</span></h2><button class="btn small mgr" type="button" id="btnAddBasket" data-block="basket">+ В список заказа</button></div>
+    <div class="card-b">
+      <div class="grid">
+        <label class="field u-span2"><span class="lbl"><span class="t-s">Название</span><span class="t-f">Деталь</span></span><span class="inp"><input type="text" data-bind="part.name" aria-label="Название детали"></span></label>
+        <div class="field" data-block="batch"><label class="lbl" for="qtyInp"><span class="t-s">Количество</span><span class="t-f">Тираж</span></label><span class="inp"><input id="qtyInp" type="number" min="1" max="100000" step="1" data-bind="part.qty" inputmode="numeric"><em>шт</em></span><small class="cap warn-text" id="qtyHint" hidden></small>
+          <div class="quick" data-quick="part.qty"><button type="button" data-v="1">1</button><button type="button" data-v="10">10</button><button type="button" data-v="50">50</button><button type="button" data-v="100">100</button></div></div>
+        <label class="field adv" data-block="batch" data-tech="fdm sla dlp lcd"><span class="lbl" title="0 — посчитать по габаритам">На одном столе</span><span class="inp"><input id="ppInp" type="number" min="0" step="1" data-bind="part.perPlate"><em id="ppAuto">авто</em></span></label>
+        <label class="field adv" data-block="post"><span class="lbl" id="postLbl">Постобработка 1 шт</span><span class="inp"><input id="postInp" type="number" min="0" step="1" data-bind="part.postMin"><em>мин</em></span></label>
+        <label class="field pro" data-block="labor" data-tech="sla dlp lcd"><span class="lbl">Мойка, засветка</span><span class="inp"><input type="number" min="0" step="1" data-bind="sla.washMin"><em>мин/стол</em></span></label>
+        <label class="field pro" data-tech="sla dlp lcd"><span class="lbl">Спирт, перчатки</span><span class="inp"><input type="number" min="0" step="10" data-bind="sla.washCost"><em>₽/стол</em></span></label>
+        <label class="field adv" data-block="labor" data-tech="sls"><span class="lbl">Распаковка, очистка</span><span class="inp"><input type="number" min="0" step="5" data-bind="sls.unpackMin"><em>мин/запуск</em></span></label>
+      </div>
+    </div>
+  </section>
+
+  <section class="card adv" id="secExtra" data-block="extras">
+    <div class="card-h"><h2>Доп. услуги</h2></div>
+    <div class="card-b">
+      <div class="grid">
+        <label class="field"><span class="lbl">Втулки на 1 шт</span><span class="inp"><input type="number" min="0" step="1" data-bind="part.inserts"><em>шт</em></span></label>
+        <label class="check"><input type="checkbox" data-bind="part.paintOn">Покраска</label>
+        <label class="field"><span class="lbl">Моделирование</span><span class="inp"><input type="number" min="0" step="0.5" data-bind="money.cadH"><em>ч</em></span></label>
+        <label class="check"><input type="checkbox" data-bind="part.packOn">Упаковка</label>
+      </div>
+      <div class="grid pro">
+        <label class="field"><span class="lbl">Цена втулки</span><span class="inp"><input type="number" min="0" step="1" data-bind="money.insertPrice"><em>₽</em></span></label>
+        <label class="field"><span class="lbl">Покраска</span><span class="inp"><input type="number" min="0" step="10" data-bind="money.paintPrice"><em>₽/шт</em></span></label>
+        <label class="field"><span class="lbl">Ставка моделирования</span><span class="inp"><input type="number" min="0" step="100" data-bind="money.cadRate"><em>₽/ч</em></span></label>
+        <label class="field"><span class="lbl">Упаковка</span><span class="inp"><input type="number" min="0" step="10" data-bind="money.packaging"><em>₽</em></span></label>
+      </div>
+    </div>
+  </section>
+
+  <section class="card adv" id="secTime" data-block="schedule">
+    <div class="card-h"><h2>Сроки</h2></div>
+    <div class="card-b">
+      <div class="grid">
+        <label class="field mgr"><span class="lbl">Срок выполнения</span><span class="inp"><input type="number" min="0" max="365" step="1" data-bind="part.leadDays" id="leadInp" placeholder="авто"><em>раб. дн.</em></span></label>
+        <label class="field"><span class="lbl">Нужно к</span><span class="inp"><input type="datetime-local" data-bind="money.deadline"></span></label>
+        <div class="field pro u-full"><span class="lbl">Дополнительные нерабочие дни</span><textarea class="u-wide" data-bind="money.offDays" rows="2" placeholder="ГГГГ-ММ-ДД через запятую, например 2027-01-11, 2027-05-10" aria-label="Дополнительные нерабочие дни"></textarea><small class="cap">Праздники 2026 года с переносами уже учтены. Для других лет учитываются государственные праздники и их перенос с выходных; переносы из производственного календаря (особенно январские) добавьте сюда, когда календарь на год опубликован.</small></div>
+        <label class="field mgr"><span class="lbl">Принтер занят до</span><span class="inp"><input type="datetime-local" data-bind="money.busyUntil"></span></label>
+        <label class="field pro"><span class="lbl">Старт печати</span><span class="inp"><input type="datetime-local" data-bind="money.start"></span></label>
+        <label class="field pro"><span class="lbl">Наценка за срочность</span><span class="inp"><input type="number" min="0" max="300" step="5" data-bind="money.rushPct"><em>%</em></span></label>
+      </div>
+      <div class="when" id="whenBox"></div>
+      <div class="mgr u-row"><button class="btn small" type="button" id="busyNow">Принтер свободен</button><button class="btn small" type="button" id="busyAfter">Занять принтер этим заказом</button></div>
+    </div>
+  </section>
+
+  <section class="card mgr" id="secMoney">
+    <div class="card-h"><h2>Цена</h2></div>
+    <div class="card-b">
+      <div class="grid">
+        <div class="field"><label class="lbl" for="mk">Наценка</label><span class="inp"><input id="mk" type="number" min="0" max="2000" step="5" data-bind="money.markup"><em>%</em></span>
+          <div class="quick" id="mkPresets"></div><small class="cap mk-limit" id="mkLimit"></small></div>
+        <div class="field" data-block="discount"><label class="lbl" for="adj">Скидка − / срочность +</label><span class="inp"><input id="adj" type="number" min="-90" max="300" step="5" data-bind="money.adjust"><em>%</em></span>
+          <div class="quick" data-quick="money.adjust"><button type="button" data-v="-10">−10</button><button type="button" data-v="0">0</button><button type="button" data-v="50">+50</button></div></div>
+        <div class="field pro" data-block="discount"><span class="lbl">Мин. заказ</span><span class="inp"><input type="number" min="0" step="50" data-bind="money.minOrder" aria-label="Минимальный заказ"><em>₽</em></span><span class="inp u-mt4"><select data-bind="money.minMode" aria-label="НДС и минимальный заказ"><option value="gross">НДС уже внутри суммы</option><option value="net">НДС добавить сверху</option></select></span></div><div class="field pro u-full"><p class="cap u-m08">Заполняется один раз. Попадает в текст КП, в выписку и в кнопки «Отправить заявку» у клиента.</p><div class="grid"><label class="field"><span class="lbl">Название мастерской</span><span class="inp"><input type="text" data-bind="money.shopName" placeholder="Например: Мастерская 3D"></span><small class="cap">Заменит «Смета 3D-печати» в шапке сайта</small></label><div class="field"><span class="lbl">Логотип</span><div class="u-row u-ac"><img id="logoPrev" class="logo-prev" alt="Логотип" hidden><label class="btn small file-btn">Загрузить<input type="file" id="logoFile" accept="image/png,image/jpeg,image/webp,image/svg+xml"></label><button class="btn small ghost" type="button" id="logoDel" hidden>Убрать</button></div><label class="check" hidden><input type="checkbox" id="logoBgChk">Светлая подложка в шапке — если логотип тёмный</label><small class="cap">PNG на прозрачном фоне. В шапке и КП</small></div><div class="field"><span class="lbl">Фирменный цвет</span><div class="u-row u-ac"><input type="color" id="brandClr" class="clr" aria-label="Фирменный цвет"><button class="btn small ghost" type="button" id="brandDel" hidden>Как было</button></div><small class="cap">Кнопки, заголовки, КП. Карточки — оттенки рядом с ним</small></div><label class="field"><span class="lbl">Условия оплаты</span><span class="inp"><input type="text" data-bind="money.kpPay" placeholder="100% предоплата"></span></label><label class="field u-full"><span class="lbl">Контакты и реквизиты — внизу КП</span><textarea class="u-wide" data-bind="money.shopInfo" rows="3" placeholder="Телефон, почта, ИНН, адрес"></textarea></label><label class="field"><span class="lbl">Почта для заявок</span><span class="inp"><input type="email" data-bind="money.cEmail" placeholder="shop@example.ru"></span></label><label class="field"><span class="lbl">Telegram для заявок</span><span class="inp"><input type="text" data-bind="money.cTg" placeholder="@имя"></span></label><label class="field"><span class="lbl">WhatsApp для заявок</span><span class="inp"><input type="tel" data-bind="money.cWa" placeholder="+7 900 000-00-00"></span></label><div class="field kp-ed u-full"><span class="lbl">Шаблон КП</span><ol class="cap kp-how"><li>Нажмите «Начать со стандартного текста».</li><li>Меняйте текст как обычное письмо: добавляйте приветствие, условия, подпись.</li><li>Чтобы вставить данные заказа, поставьте курсор и нажмите кнопку ниже — в тексте появится поле в фигурных скобках, в КП вместо него будут цифры. Если данных нет (например, скидки), строка не попадёт в КП.</li></ol><p class="cap" id="kpTplState"></p><div class="u-row"><button class="btn small primary" type="button" id="kpTplDef">Начать со стандартного текста</button><button class="btn small ghost" type="button" id="kpTplClr">Вернуть стандартное КП</button></div><div class="kp-cols"><div><p class="sub">Текст шаблона</p><div id="kpTplVars" class="kp-vars"></div><textarea class="u-wide u-mono" id="kpTplIn" data-bind="money.kpTpl" rows="16" spellcheck="false" placeholder="Пусто — используется стандартное КП"></textarea></div><div><p class="sub">Так увидит клиент</p><pre id="kpTplPrev" class="kp-prev"></pre></div></div></div><label class="field"><span class="lbl">КП действует</span><span class="inp"><input type="number" min="0" max="365" step="1" data-bind="money.kpDays"><em>дн.</em></span></label><label class="field mx-days"><span class="lbl" title="Если срок дольше — клиент видит «по запросу, свяжитесь с нами». 0 — не предупреждать">Дольше этого срока — «по запросу»</span><span class="inp"><input type="number" min="0" max="3650" step="1" data-bind="money.maxDays"><em>раб. дн.</em></span></label></div></div>
+        <div class="field pro" data-block="tax"><label class="lbl" for="tx" title="Цена = сумма ÷ (1 − ставка), чтобы после налога осталась нужная сумма">Налог с выручки</label><span class="inp"><input id="tx" type="number" min="0" max="50" step="0.5" data-bind="money.taxRev"><em>%</em></span>
+          <div class="quick" data-quick="money.taxRev"><button type="button" data-v="0">0</button><button type="button" data-v="4">4</button><button type="button" data-v="6">6</button></div></div>
+        <div class="field pro" data-block="tax"><label class="lbl" for="vat">НДС сверху</label><span class="inp"><input id="vat" type="number" min="0" max="30" step="1" data-bind="money.vat"><em>%</em></span>
+          <div class="quick" data-quick="money.vat"><button type="button" data-v="0">0</button><button type="button" data-v="5">5</button><button type="button" data-v="22">22</button></div></div>
+      </div>
+      <div class="opt-box" data-block="discount">
+        <p class="sub">Скидки за опт</p>
+        <label class="check"><input type="checkbox" data-bind="money.optOn">Скидка по общему количеству штук в заказе</label>
+        <div id="optRows" class="opt-rows"></div>
+        <button type="button" class="pop-link" id="optAdd">+ Добавить порог</button>
+        <small class="cap">Берётся самый большой порог, до которого дотянул заказ. Видно в «Цене за штуку при тираже» и в тексте КП. В «Расширенном» скидка — не больше допуска менеджера.</small>
+      </div>
+      <details class="pro mkd"><summary class="sub">Кнопки типов клиента</summary><div class="mkedit" id="mkEdit"></div></details>
+      <div class="pro grid">
+        <label class="field"><span class="lbl">Допуск менеджера</span><span class="inp"><input type="number" min="0" max="500" step="5" data-bind="money.mgrTol"><em>± п.п.</em></span><small class="cap">Насколько в «Расширенном» можно сдвинуть наценку и скидку</small></label>
+        <label class="field owner-only"><span class="lbl">Новый пароль сотрудника</span><span class="inp"><input type="password" id="pwStaff" autocomplete="new-password"></span></label>
+        <label class="field owner-only"><span class="lbl">Новый пароль друзей</span><span class="inp"><input type="password" id="pwFriend" autocomplete="new-password"></span></label>
+        <label class="field owner-only"><span class="lbl">Новый пароль владельца</span><span class="inp"><input type="password" id="pwPro" autocomplete="new-password"></span><small class="cap">От 12 символов, буквы и цифры. <button type="button" class="pop-link" id="engPwSave">Сменить пароли</button></small></label>
+        <div class="field u-full"><span class="lbl">Параметры мастерской для сайта</span><small class="cap" id="ratesInfo"></small><div class="u-row u-mt4"><button type="button" class="btn small primary owner-only" id="ratesPub">Опубликовать на сайт</button><button type="button" class="btn small" id="ratesDl">Скачать файл ставок</button><button type="button" class="btn small" id="ratesHow">Как обновить сайт</button><button type="button" class="pop-link owner-only" id="ratesKey">Ключ GitHub</button></div><div class="alert warn rates-chk u-mt8" id="ratesChk" hidden></div></div>
+      </div>
+      <div class="pro u-col">
+        <p class="sub">Работа и производство</p>
+        <div class="grid">
+          <label class="field" data-block="labor post"><span class="lbl">Оператор</span><span class="inp"><input type="number" min="0" step="50" data-bind="money.rate"><em>₽/ч</em></span></label>
+          <label class="field" data-block="labor"><span class="lbl">Наценка на подготовку</span><span class="inp"><input type="number" min="0" max="500" step="5" data-bind="money.prepMk"><em>%</em></span></label>
+          <label class="field" data-block="labor"><span class="lbl">Приём заказа</span><span class="inp"><input type="number" min="0" step="1" data-bind="money.setupMin"><em>мин</em></span></label>
+          <label class="field" data-block="labor" data-tech="fdm"><span class="lbl">Снятие со стола</span><span class="inp"><input type="number" min="0" step="1" data-bind="money.plateMin"><em>мин</em></span></label>
+          <label class="field" data-block="energy"><span class="lbl">Электроэнергия</span><span class="inp"><input type="number" min="0" step="0.1" data-bind="money.kwh"><em>₽/кВт·ч</em></span></label>
+          <label class="check" data-block="energy"><input type="checkbox" data-bind="money.twoRate">Два тарифа: день / ночь</label>
+          <label class="field" data-block="risk"><span class="lbl" title="Доля деталей, которые придётся печатать заново">Брак</span><span class="inp"><input type="number" min="0" max="60" step="1" data-bind="money.risk"><em>%</em></span></label>
+          <label class="field" data-block="risk" data-tech="fdm sla dlp lcd"><span class="lbl" title="FDM: продувка, концы катушек. Смола: остаётся на поддержках и в ванне">Потери материала</span><span class="inp"><input type="number" min="0" max="50" step="1" data-bind="money.waste"><em>%</em></span></label>
+          <label class="field"><span class="lbl">Принтеров</span><span class="inp"><input type="number" min="1" step="1" data-bind="money.printers"><em>шт</em></span></label>
+          <label class="field"><span class="lbl">Печать в сутки</span><span class="inp"><input type="number" min="1" max="24" step="1" data-bind="money.hoursPerDay"><em>ч</em></span></label>
+        </div>
+        <div class="grid" id="nightBox" data-block="energy">
+          <label class="field"><span class="lbl">Ночной тариф</span><span class="inp"><input type="number" min="0" step="0.1" data-bind="money.kwhNight"><em>₽/кВт·ч</em></span></label>
+          <label class="field"><span class="lbl">Ночь с</span><span class="inp"><input type="number" min="0" max="23" step="1" data-bind="money.nightFrom"><em>ч</em></span></label>
+          <label class="field"><span class="lbl">Ночь до</span><span class="inp"><input type="number" min="0" max="23" step="1" data-bind="money.nightTo"><em>ч</em></span></label>
+        </div>
+      </div>
+    </div>
+  </section>
+  <section class="card pro owner-only" id="secVis">
+    <div class="card-h"><h2>Что видят пользователи</h2><span class="cap">Смотреть как:</span><button type="button" class="btn small" data-as="simple">Простой</button><button type="button" class="btn small" data-as="adv">Расширенный</button><button type="button" class="btn small" data-as="staff">Сотрудник</button><button type="button" class="btn small" id="visPrevF">Посмотреть как «Друзья»</button></div>
+    <div class="card-b">
+      <p class="hint">Галочка — поле видно в этом режиме. Изменения применяются кнопкой «Сохранить». Скрытое поле не удаляется: расчёт идёт по значению мастерской, а вернуть его можно в любой момент. «Бизнес» всегда видит всё. Чтобы проверить, переключитесь на «Простой» или «Расширенный» сверху. На сайт настройка попадает вместе с файлом ставок.</p>
+      <p class="cap">Подсветка: <span class="vis-c mod u-swatch"></span> — не как в стандартном виде, <span class="vis-c ch u-swatch"></span> — изменено и ещё не сохранено.</p>
+      <div class="vis-table" id="visTable"></div>
+      <div class="save-bar"><button type="button" class="btn small primary" id="visSave" disabled>Сохранить</button><button type="button" class="btn small" id="visCancel" disabled>Отменить</button><small class="cap" id="visInfo"></small><button type="button" class="pop-link" id="visReset">Стандартный вид</button></div>
+    </div>
+  </section>
+  <section class="card pro" id="secCalib">
+    <div class="card-h"><h2>Сверка с реальными печатями</h2></div>
+    <div class="card-b">
+      <p class="hint">Загрузите 3–5 деталей, которые вы печатали на своём принтере: модель (STL, 3MF или OBJ) и G-code из слайсера с <b>тем же именем</b> — например, корпус.stl и корпус.gcode. Калькулятор возьмёт настройки нарезки из G-code, сравнит вес и время со слайсером и предложит поправки для выбранного принтера.</p>
+      <label class="btn small primary file-btn u-start">Выбрать файлы<input type="file" id="calibFiles" multiple accept=".stl,.obj,.3mf,.gcode,.gco"></label>
+      <div id="calibOut"></div>
+    </div>
+  </section>
+  <section class="card pro" id="secEquip">
+    <div class="card-h"><h2>Принтеры и материалы</h2><div class="eq-tabs" id="eqTabs"><button type="button" data-g="fdm" class="on">FDM</button><button type="button" data-g="resin">Фотополимер</button><button type="button" data-g="sls">SLS</button></div></div>
+    <div class="card-b">
+      <p class="hint">Галочка — есть в мастерской: в списках у клиентов и сотрудников только отмеченное. Галочки и цены применяются кнопкой «Сохранить», остальные параметры — через ✎. На сайт всё попадает через «Опубликовать на сайт» в блоке «Цена» (или вручную — «Скачать файл ставок»).</p>
+      <p class="sub">Принтеры</p>
+      <div class="eq-list" id="eqPrinters"></div>
+      <button type="button" class="pop-link" id="eqAddP">+ Добавить принтер</button>
+      <p class="sub">Материалы</p>
+      <p class="cap">Пунктирная рамка у цены — цена отличается от рыночной («рынок …» под названием); «Цены по рынку» подставит рыночные.</p>
+      <div class="eq-list" id="eqMats"></div>
+      <div class="save-bar"><button type="button" class="btn small primary" id="eqSave" disabled>Сохранить</button><button type="button" class="btn small" id="eqCancel" disabled>Отменить</button><small class="cap" id="eqState"></small></div>
+      <div class="eq-foot"><button type="button" class="pop-link" id="eqAddM">+ Добавить материал</button><button type="button" class="pop-link" id="eqMarket">Цены по рынку</button><small class="cap">Рыночные цены: <span id="eqMarketAt"></span>, середина цен основных брендов в магазинах РФ</small></div>
+    </div>
+  </section>
+</div>
+
+<aside class="col-side" id="sideCol">
+  <section class="sum" id="sumCard">
+    <div class="sum-h"><h2><span class="t-s">Стоимость</span><span class="t-f">Смета</span></h2><span class="scope" id="scope"></span></div>
+    <div class="sum-b">
+      <div class="price"><span class="k"><span class="t-s">К оплате</span><span class="t-f">Цена для клиента</span></span><span class="big" id="sumTotal">—</span><span class="unit" id="sumUnit"></span></div>
+      <div class="tags" id="sumFacts"></div>
+      <div class="alerts" id="sumAlerts"></div>
+      <div class="adv"><div class="bar mgr" id="sumBar"></div><div class="rows u-mt6" id="sumRows"></div></div>
+      <div class="rows" id="sumTotals"></div>
+      <div class="cli client-info" id="cliInfo"></div>
+      <div class="mgr cmp" id="cmpBox" hidden></div>
+      <div id="tiersBox" data-block="batch"><p class="sub u-mb6" id="tiersH">Цена за штуку при тираже</p><div class="tiers" id="tiers"></div><small class="cap tiers-note">«опт» — скидка за объём, «до минимума» — сумма поднята до минимального заказа.</small></div>
+      <details class="pcmp" id="pcmpBox" hidden><summary><span class="sub">Эта деталь на других принтерах</span></summary><div class="pcmp-w"><table><thead><tr><th>Принтер</th><th class="r">Себест.</th><th class="r">Цена</th><th class="r">Срок</th></tr></thead><tbody id="pcmp"></tbody></table></div><small class="cap">Те же материал, качество и тираж. Зелёным — самая низкая себестоимость и самый короткий срок. Щёлкните строку, чтобы выбрать принтер.</small></details>
+      <div class="cli vyp" id="vypBox">
+        <button class="btn small" type="button" id="vypShow">Показать выписку</button>
+        <div class="vyp-gate" id="vypGate" hidden></div>
+        <div id="vypOut" hidden><textarea id="vypText" readonly aria-label="Выписка"></textarea><button class="btn small primary" type="button" id="vypCopy">Скопировать выписку</button></div>
+      </div>
+      <div class="lead-box u-row u-mt8" id="leadBtns"></div>
+      <details class="kp mgr" id="kpBox" data-block="kp">
+        <summary><span class="sub">Текст КП</span><span class="u-flex4"><button class="btn small" type="button" id="btnSaveKP">Скачать .txt</button><button class="btn small" type="button" id="btnPrintKP">Печать / PDF</button><button class="btn small primary" type="button" id="btnCopy">Скопировать</button></span></summary>
+        <div class="kp-cli"><span class="inp"><input type="text" id="kpClient" placeholder="Для кого: компания или имя (необязательно)" aria-label="Клиент для КП"></span><small class="cap" id="kpNext"></small></div>
+        <textarea id="kpText" readonly aria-label="Текст коммерческого предложения"></textarea>
+      </details>
+    </div>
+  </section>
+</aside>
+</main>
+<footer class="site-foot">© 2026 Смета 3D. Все права защищены. Копирование и использование материалов сайта без разрешения запрещено. · <a href="plugin.html">Плагин для OrcaSlicer</a> · <a href="#admin" id="lnkLogin">Вход для мастерской</a></footer>
+
+<div class="mbar" id="mbar"><div><b id="mbTotal">—</b><small id="mbUnit"></small></div><button class="btn small" type="button" id="mbGo">Смета ↓</button></div>
+
+<div class="overlay" id="dlg" hidden>
+  <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="dlgTitle">
+    <div class="dlg-h"><h3 id="dlgTitle"></h3><button class="btn small ghost" type="button" id="dlgClose" aria-label="Закрыть">✕</button></div>
+    <div class="dlg-b" id="dlgBody"></div>
+    <div class="dlg-f" id="dlgFoot"></div>
+  </div>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="app.js?v=9e8ad54e"></script>
+
+</body>
+</html>
