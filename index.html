@@ -13,7 +13,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" integrity="sha512-dLxUelApnYxpLt6K2iomGngnHO83iUvZytA3YjDUCjT0HDOHKXnVYdf3hU4JjM8uEhxf9nD1/ey98U3t2vZ0qQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" integrity="sha512-XMVd28F1oH/O71fzwBnV7HucLxVwtxf26XV8P4wPk26EDxuGZ91N8bsOttmnomcCD3CS5ZMRL50H0GgOHvegtg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script>/* CDN недоступен или файл подменён — берём копии из репозитория */window.THREE||document.write('<script src="vendor/three-r128.min.js"><\/script>');window.JSZip||document.write('<script src="vendor/jszip-3.10.1.min.js"><\/script>');</script>
-<link rel="stylesheet" href="styles.css?v=6b75b014">
+<link rel="stylesheet" href="styles.css?v=45320b9c">
 </head>
 <body>
 <div class="as-bar" id="asBar" hidden><span id="asBarT"></span> · <button class="as-bar-x" type="button" id="asBarX">Выйти из просмотра</button></div>
@@ -122,7 +122,7 @@
           <div class="facts" id="facts"></div>
           <div class="part-chips" id="partChips" hidden></div>
           <div id="basketBox" class="basket-side" hidden data-block="basket">
-            <div class="u-between u-mb6"><p class="sub">Детали заказа</p><span class="u-flex6"><button class="btn small" type="button" id="btnAddPart2">+ Деталь</button><button class="btn small ghost danger" type="button" id="btnClearBasket" title="Удалить все позиции и вернуться к расчёту одной детали">Очистить список</button></span></div>
+            <div class="u-between u-mb6"><p class="sub">Детали заказа</p><span class="u-flex6"><button class="btn small" type="button" id="btnAddPart2">+ Деталь</button><button class="btn small ghost" type="button" id="btnBulk" title="Сменить технологию и материал сразу у всех деталей заказа">Для всех…</button><button class="btn small ghost danger" type="button" id="btnClearBasket" title="Удалить все позиции и очистить окно просмотра">Очистить список</button></span></div>
             <div class="basket" id="basket"></div>
           </div>
           <button class="btn small u-start" type="button" id="btnAddPart" data-block="basket">+ Ещё деталь в заказ</button>
@@ -440,7 +440,7 @@
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-<script src="app.js?v=ba9a7a40"></script>
+<script src="app.js?v=cf7a1a1f"></script>
 
 </body>
 </html>

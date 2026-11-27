@@ -3833,3 +3833,5 @@ textarea {
 
 /* панель «В расчёте» больше не нужна — скрыта */
 #strip { display: none !important }
+
+.sp-cnt { color: var(--accent, #f5a524); font-weight: 700 }
