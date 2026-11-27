@@ -5931,7 +5931,11 @@ window.__SMETA_SITE__ = 1;
   }
 
   function it(t, e) {
-    f("busyText").textContent = e || "Считаю…", f("busy").hidden = !t
+    f("busyText").textContent = e || "Считаю…", f("busy").hidden = !t, clearTimeout(it.wd);
+    /* страховка: если расчёт оборвался на ошибке, табличка «Считаю…» не должна висеть вечно */
+    t && (it.wd = setTimeout(() => {
+      f("busy").hidden || (f("busy").hidden = !0, V("Расчёт шёл слишком долго и был прерван. Если цены нет — загрузите модель ещё раз или пришлите файл"))
+    }, 9e4))
   }
   const kt = () => new Promise(t => setTimeout(t, 20));
   const loDB = {
@@ -6143,7 +6147,12 @@ onmessage=e=>{const{id,pos,keys,fdm,light,hull}=e.data;if(hull){try{postMessage(
     nt.get("lo.empty", 0) && nt.del("lo.empty");
     l.part.ppGc && (l.part.perPlate = 0, l.part.ppGc = 0);
     je(!0), it(!0), await kt(), tn(t);
-    const n = await loVn(t);
+    let n;
+    try {
+      n = await loVn(t)
+    } catch (e) {
+      throw it(!1), e
+    }
     t = n.pos;
     H = {
       pos: t,
@@ -6156,9 +6165,15 @@ onmessage=e=>{const{id,pos,keys,fdm,light,hull}=e.data;if(hull){try{postMessage(
   }
   async function Wt(t) {
     je(!0), it(!0), await kt();
-    const h0 = H,
-      s0 = await loVn(h0.pos);
-    if (H !== h0) return;
+    const h0 = H;
+    if (!h0) return it(!1);
+    let s0;
+    try {
+      s0 = await loVn(h0.pos)
+    } catch (e) {
+      throw it(!1), e
+    }
+    if (H !== h0) return it(!1);
     H.st = s0, H.pos = s0.pos, H.ver = ++da, loSaveM(), ne = null, it(!1), ge(), t || Sn(), Me(), at(), ka(), Hn(), Ft(), $a(), Vt()
   }
 
@@ -6354,7 +6369,7 @@ onmessage=e=>{const{id,pos,keys,fdm,light,hull}=e.data;if(hull){try{postMessage(
 
   /* полная очистка: список заказа, стол, сохранённые модели, окно просмотра пустое */
   async function loClearAll() {
-    loFace && loFaceStop(), l.basket = [], loCur = null, loAllView = !1, loGeo.forEach(g => (g.geom && g.geom.dispose(), g.px && g.px.dispose())), loGeo.clear(), delete loSoloG.px, loGrp && loGrp.clear(), loBeds && loBeds.clear(), loDk = "", clearTimeout(loSt);
+    loFace && loFaceStop(), it(!1), l.basket = [], loCur = null, loAllView = !1, loGeo.forEach(g => (g.geom && g.geom.dispose(), g.px && g.px.dispose())), loGeo.clear(), delete loSoloG.px, loGrp && loGrp.clear(), loBeds && loBeds.clear(), loDk = "", clearTimeout(loSt);
     try {
       await loDB.del()
     } catch (e) {}
@@ -6872,6 +6887,7 @@ onmessage=e=>{const{id,pos,keys,fdm,light,hull}=e.data;if(hull){try{postMessage(
     const sig = () => [l.tech, (ht() || {}).id, (Ct() || {}).id, l.slicer.layer, l.slicer.nozzle, l.slicer.walls].join("|");
     let a, o, g, s = null;
     for (let k = 0; ;) {
+      if (H !== H1) return it(!1);
       k === 0 && (a = ht(), o = Ct(), g = sig(), s = null);
       if (k >= n.length) break;
       const i = n[k],
@@ -8829,7 +8845,7 @@ uniform float uLayerH;`).replace("#include <color_fragment>", `#include <color_f
           f("autoOrient").hidden = !0, G && je(!0), H.pos.set(P0), await Wt(), V("Положение — как в файле")
         }
       } catch (e) {
-        console.error(e)
+        console.error(e), it(!1)
       } finally {
         ja = !1
       }
@@ -11168,7 +11184,7 @@ uniform float uLayerH;`).replace("#include <color_fragment>", `#include <color_f
       e.key === "Escape" && !f("layMenu").hidden && loLayMenu(!1)
     }), addEventListener("scroll", () => f("layMenu").hidden || loLayMenu(!1), !0), addEventListener("resize", () => f("layMenu").hidden || loLayMenu(!1)), f("btnFace").onclick = loFaceStart, f("btnSplit").onclick = loSplit, document.addEventListener("keydown", i => {
       const g = i.target;
-      (i.key === "f" || i.key === "F" || i.key === "а" || i.key === "А") && !i.ctrlKey && !i.metaKey && !i.altKey && !(g && (g.isContentEditable || /^(INPUT|SELECT|TEXTAREA)$/.test(g.tagName))) && f("dlg").hidden && !f("btnFace").hidden && f("btnFace").offsetParent && (i.preventDefault(), loFaceStart())
+      (i.key === "f" || i.key === "F" || i.key === "а" || i.key === "А") && !i.ctrlKey && !i.metaKey && !i.altKey && !(g && (g.isContentEditable || /^(INPUT|SELECT|TEXTAREA)$/.test(g.tagName))) && f("dlg").hidden && !f("btnFace").hidden && l.mode !== "simple" && H && (i.preventDefault(), loFaceStart())
     }), f("btnOrient").onclick = Sa, f("btnRepair").onclick = La, f("btnOver").onclick = () => {
       En = !En, f("btnOver").classList.toggle("on", En), ge()
     }, f("btnCam").onclick = Sn;
